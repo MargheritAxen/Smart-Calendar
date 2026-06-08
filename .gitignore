@@ -1,0 +1,26 @@
+# macOS
+.DS_Store
+
+# Streamlit secrets
+.streamlit/
+
+# Python
+__pycache__/
+*.pyc
+
+# Virtual environments
+venv/
+.venv/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Export
+*.csv
+*.xlsx
+
+# IDE
+.vscode/
+.idea/
