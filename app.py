@@ -174,12 +174,12 @@ def genera_excel_formattato(df, df_feste, riepilogo, anno):
         ws[f"A{i}"].border = border
         ws[f"B{i}"].border = border
 
-    start_cols = [1, 6, 11]
-    start_rows = [7, 44, 81, 118]
+    start_cols = [1, 6, 11, 16]  # 4 mesi per riga
+    start_rows = [7, 44, 81]
 
     for month in range(1, 13):
-        block_col = start_cols[(month - 1) % 3]
-        block_row = start_rows[(month - 1) // 3]
+        block_col = start_cols[(month - 1) % 4]
+        block_row = start_rows[(month - 1) // 4]
 
         ws.merge_cells(start_row=block_row, start_column=block_col, end_row=block_row, end_column=block_col + 3)
         c = ws.cell(block_row, block_col, mesi[month - 1])
