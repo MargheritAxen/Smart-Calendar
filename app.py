@@ -588,20 +588,11 @@ with tab3:
 
     st.divider()
 
-    csv = df.to_csv(index=False).encode("utf-8")
-
-    st.download_button(
-        "Scarica CSV",
-        data=csv,
-        file_name="presenze_smart.csv",
-        mime="text/csv",
-        use_container_width=True
-    )
-
+    # Unico export disponibile: Excel formattato
     excel_formattato = genera_excel_formattato(df, df_feste, riepilogo, anno=2026)
 
     st.download_button(
-        "Scarica Excel formattato",
+        "Scarica Excel",
         data=excel_formattato,
         file_name="smart_calendar_2026_formattato.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
