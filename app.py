@@ -174,12 +174,12 @@ def genera_excel_formattato(df, df_feste, riepilogo, anno):
         ws[f"A{i}"].border = border
         ws[f"B{i}"].border = border
 
-    start_cols = [1, 6, 11, 16]  # 4 mesi per riga
-    start_rows = [7, 44, 81]
+    start_cols = [1, 6, 11]  # 3 mesi per riga
+    start_rows = [7, 44, 81, 118]
 
     for month in range(1, 13):
-        block_col = start_cols[(month - 1) % 4]
-        block_row = start_rows[(month - 1) // 4]
+        block_col = start_cols[(month - 1) % 3]
+        block_row = start_rows[(month - 1) // 3]
 
         ws.merge_cells(start_row=block_row, start_column=block_col, end_row=block_row, end_column=block_col + 3)
         c = ws.cell(block_row, block_col, mesi[month - 1])
@@ -225,7 +225,7 @@ def genera_excel_formattato(df, df_feste, riepilogo, anno):
             for p_idx in range(len(persone)):
                 dv.add(f"{get_column_letter(col + 2 + p_idx)}{row + 2}:{get_column_letter(col + 2 + p_idx)}{row + 32}")
 
-    for col in range(1, 21):
+    for col in range(1, 16):
         ws.column_dimensions[get_column_letter(col)].width = 13
 
     # Riepilogo leggibile
@@ -327,6 +327,36 @@ def salva_presenze(df):
         ws_presenze.append_rows(df.values.tolist())
 
     svuota_cache_dati()
+
+
+# ===== IMPORT AUTOMATICO PRESENZE STORICHE MARgherita =====
+IMPORT_PRESENZE_MARGHERITA = [('2026-01-02', 'Margherita', 'Smart'), ('2026-01-05', 'Margherita', 'Ufficio'), ('2026-01-07', 'Margherita', 'Ufficio'), ('2026-01-08', 'Margherita', 'Smart'), ('2026-01-09', 'Margherita', 'Ufficio'), ('2026-01-12', 'Margherita', 'Smart'), ('2026-01-13', 'Margherita', 'Ufficio'), ('2026-01-14', 'Margherita', 'Ufficio'), ('2026-01-15', 'Margherita', 'Assenza'), ('2026-01-16', 'Margherita', 'Smart'), ('2026-01-19', 'Margherita', 'Assenza'), ('2026-01-20', 'Margherita', 'Smart'), ('2026-01-21', 'Margherita', 'Ufficio'), ('2026-01-22', 'Margherita', 'Ufficio'), ('2026-01-23', 'Margherita', 'Ufficio'), ('2026-01-26', 'Margherita', 'Ufficio'), ('2026-01-27', 'Margherita', 'Smart'), ('2026-01-28', 'Margherita', 'Ufficio'), ('2026-01-29', 'Margherita', 'Smart'), ('2026-01-30', 'Margherita', 'Smart'), ('2026-02-02', 'Margherita', 'Smart'), ('2026-02-03', 'Margherita', 'Assenza'), ('2026-02-04', 'Margherita', 'Smart'), ('2026-02-05', 'Margherita', 'Smart'), ('2026-02-06', 'Margherita', 'Assenza'), ('2026-02-09', 'Margherita', 'Smart'), ('2026-02-10', 'Margherita', 'Ufficio'), ('2026-02-11', 'Margherita', 'Smart'), ('2026-02-12', 'Margherita', 'Ufficio'), ('2026-02-13', 'Margherita', 'Ufficio'), ('2026-02-16', 'Margherita', 'Ufficio'), ('2026-02-17', 'Margherita', 'Smart'), ('2026-02-18', 'Margherita', 'Smart'), ('2026-02-19', 'Margherita', 'Ufficio'), ('2026-02-20', 'Margherita', 'Smart'), ('2026-02-23', 'Margherita', 'Ufficio'), ('2026-02-24', 'Margherita', 'Smart'), ('2026-02-25', 'Margherita', 'Ufficio'), ('2026-02-26', 'Margherita', 'Ufficio'), ('2026-02-27', 'Margherita', 'Smart'), ('2026-03-02', 'Margherita', 'Ufficio'), ('2026-03-03', 'Margherita', 'Smart'), ('2026-03-04', 'Margherita', 'Smart'), ('2026-03-05', 'Margherita', 'Smart'), ('2026-03-06', 'Margherita', 'Ufficio'), ('2026-03-09', 'Margherita', 'Ufficio'), ('2026-03-10', 'Margherita', 'Smart'), ('2026-03-11', 'Margherita', 'Ufficio'), ('2026-03-12', 'Margherita', 'Ufficio'), ('2026-03-13', 'Margherita', 'Ufficio'), ('2026-03-16', 'Margherita', 'Ufficio'), ('2026-03-17', 'Margherita', 'Smart'), ('2026-03-18', 'Margherita', 'Smart'), ('2026-03-19', 'Margherita', 'Assenza'), ('2026-03-20', 'Margherita', 'Assenza'), ('2026-03-23', 'Margherita', 'Assenza'), ('2026-03-24', 'Margherita', 'Assenza'), ('2026-03-25', 'Margherita', 'Assenza'), ('2026-03-26', 'Margherita', 'Assenza'), ('2026-03-27', 'Margherita', 'Smart'), ('2026-03-30', 'Margherita', 'Smart'), ('2026-03-31', 'Margherita', 'Smart'), ('2026-04-01', 'Margherita', 'Smart'), ('2026-04-02', 'Margherita', 'Assenza'), ('2026-04-07', 'Margherita', 'Assenza'), ('2026-04-08', 'Margherita', 'Assenza'), ('2026-04-09', 'Margherita', 'Ufficio'), ('2026-04-10', 'Margherita', 'Ufficio'), ('2026-04-13', 'Margherita', 'Ufficio'), ('2026-04-14', 'Margherita', 'Ufficio'), ('2026-04-15', 'Margherita', 'Smart'), ('2026-04-16', 'Margherita', 'Ufficio'), ('2026-04-17', 'Margherita', 'Smart'), ('2026-04-20', 'Margherita', 'Ufficio'), ('2026-04-21', 'Margherita', 'Smart'), ('2026-04-22', 'Margherita', 'Ufficio'), ('2026-04-23', 'Margherita', 'Smart'), ('2026-04-24', 'Margherita', 'Smart'), ('2026-04-27', 'Margherita', 'Ufficio'), ('2026-04-28', 'Margherita', 'Smart'), ('2026-04-29', 'Margherita', 'Ufficio'), ('2026-04-30', 'Margherita', 'Smart'), ('2026-05-04', 'Margherita', 'Ufficio'), ('2026-05-05', 'Margherita', 'Smart'), ('2026-05-06', 'Margherita', 'Smart'), ('2026-05-07', 'Margherita', 'Smart'), ('2026-05-08', 'Margherita', 'Ufficio'), ('2026-05-11', 'Margherita', 'Ufficio'), ('2026-05-12', 'Margherita', 'Smart'), ('2026-05-13', 'Margherita', 'Ufficio'), ('2026-05-14', 'Margherita', 'Smart'), ('2026-05-15', 'Margherita', 'Ufficio'), ('2026-05-18', 'Margherita', 'Assenza'), ('2026-05-19', 'Margherita', 'Assenza'), ('2026-05-20', 'Margherita', 'Assenza'), ('2026-05-21', 'Margherita', 'Assenza'), ('2026-05-22', 'Margherita', 'Smart'), ('2026-05-25', 'Margherita', 'Ufficio'), ('2026-05-26', 'Margherita', 'Assenza'), ('2026-05-27', 'Margherita', 'Smart'), ('2026-05-28', 'Margherita', 'Smart'), ('2026-05-29', 'Margherita', 'Assenza'), ('2026-06-01', 'Margherita', 'Assenza'), ('2026-06-03', 'Margherita', 'Ufficio'), ('2026-06-04', 'Margherita', 'Smart'), ('2026-06-05', 'Margherita', 'Smart'), ('2026-06-08', 'Margherita', 'Smart'), ('2026-06-09', 'Margherita', 'Smart')]
+
+
+def importa_presenze_margherita_una_volta():
+    """Carica nello sheet Google le presenze storiche di Margherita, senza duplicarle."""
+    valori = ws_presenze.get_all_records()
+    esistenti = set()
+
+    for r in valori:
+        data_raw = r.get("data")
+        persona = str(r.get("persona", "")).strip()
+        if data_raw and persona:
+            data_norm = pd.to_datetime(data_raw, errors="coerce")
+            if pd.notna(data_norm):
+                esistenti.add((data_norm.strftime("%Y-%m-%d"), persona))
+
+    righe_da_aggiungere = []
+    for data_str, persona, stato in IMPORT_PRESENZE_MARGHERITA:
+        chiave = (data_str, persona)
+        if chiave not in esistenti:
+            righe_da_aggiungere.append([data_str, persona, stato])
+
+    if righe_da_aggiungere:
+        ws_presenze.append_rows(righe_da_aggiungere)
+        svuota_cache_dati()
+
+    return len(righe_da_aggiungere)
 
 
 def salva_feste_manuali(df):
@@ -445,12 +475,17 @@ def calcola_riepilogo(df, df_feste):
     return riepilogo[ordine_colonne], df_valido
 
 
+righe_importate_margherita = importa_presenze_margherita_una_volta()
+
 df = leggi_presenze()
 df_feste = leggi_feste_manuali()
 riepilogo, df_valido = calcola_riepilogo(df, df_feste)
 
 
 st.title("📅 Smart Calendar")
+
+if righe_importate_margherita > 0:
+    st.success(f"Import automatico completato: {righe_importate_margherita} presenze storiche di Margherita caricate.")
 
 tab1, tab2, tab3 = st.tabs([
     "Inserisci",
