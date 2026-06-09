@@ -200,6 +200,7 @@ def genera_excel_formattato(df, df_feste, riepilogo, anno):
             row = block_row + 1 + day
             data = pd.Timestamp(year=anno, month=month, day=day).date()
             weekday = data.weekday()
+            is_festivo = data in festivita_italiane
             values = [day, giorni_it[weekday]]
             for persona in persone:
                 values.append(lookup.get((data, persona), ""))
@@ -208,8 +209,9 @@ def genera_excel_formattato(df, df_feste, riepilogo, anno):
                 cell = ws.cell(row, block_col + j, value)
                 cell.border = border
                 cell.alignment = Alignment(horizontal="center")
-                if weekday >= 5:
+                if weekday >= 5 or is_festivo:
                     cell.fill = fill_weekend
+                    cell.font = Font(bold=True, color="666666")
                 elif value == "ASS":
                     cell.fill = fill_ass
                 elif value == "PRE":
