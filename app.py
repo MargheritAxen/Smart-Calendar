@@ -623,13 +623,35 @@ with tab3:
 
     st.divider()
 
-    # Unico export disponibile: Excel formattato
-    excel_formattato = genera_excel_formattato(df, df_feste, riepilogo, anno=2026)
+    # Anni disponibili nei dati
+    if not df.empty:
+        anni_disponibili = sorted(
+            df["data"].dt.year.dropna().unique(),
+            reverse=True
+        )
+    else:
+        anni_disponibili = [date.today().year]
+
+    anno_selezionato = st.selectbox(
+        "Anno da esportare",
+        anni_disponibili
+    )
+
+    # filtro dati dell'anno selezionato
+    df_anno = df[df["data"].dt.year == anno_selezionato].copy()
+
+    excel_formattato = genera_excel_formattato(
+        df_anno,
+        df_feste,
+        riepilogo,
+        anno=int(anno_selezionato)
+    )
 
     st.download_button(
         "Scarica Excel",
         data=excel_formattato,
-        file_name="smart_calendar_2026_formattato.xlsx",
+        file_name=f"smart_calendar_{anno_selezionato}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True
     )
+        )
