@@ -264,8 +264,8 @@ def is_giorno_bloccato(giorno, df_feste):
     )
 
 
-def codice_stato(stato):
-    return CODICI.get(stato, stato)
+def codice_giustificativo(giustificativo):
+    return CODICI.get(giustificativo, giustificativo)
 
 
 @st.cache_data(ttl=30)
@@ -273,7 +273,7 @@ def leggi_presenze_cache():
     dati = ws_presenze.get_all_records()
 
     if not dati:
-        return pd.DataFrame(columns=["data", "persona", "stato"])
+        return pd.DataFrame(columns=["data", "persona", "giustificativo"])
 
     df = pd.DataFrame(dati)
     df["data"] = pd.to_datetime(df["data"], errors="coerce")
@@ -312,7 +312,7 @@ def salva_presenze(df):
     df["data"] = pd.to_datetime(df["data"]).dt.strftime("%Y-%m-%d")
 
     ws_presenze.clear()
-    ws_presenze.update(values=[["data", "persona", "stato"]], range_name="A1")
+    ws_presenze.update(values=[["data", "persona", "giustificativo"]], range_name="A1")
 
     if not df.empty:
         ws_presenze.append_rows(df.values.tolist())
@@ -362,10 +362,10 @@ def importa_presenze_margherita_una_volta():
                 esistenti.add((data_norm.strftime("%Y-%m-%d"), persona))
 
     righe_da_aggiungere = []
-    for data_str, persona, stato in IMPORT_PRESENZE_MARGHERITA:
+    for data_str, persona, giustificativo in IMPORT_PRESENZE_MARGHERITA:
         chiave = (data_str, persona)
         if chiave not in esistenti:
-            righe_da_aggiungere.append([data_str, persona, stato])
+            righe_da_aggiungere.append([data_str, persona, giustificativo])
 
     if righe_da_aggiungere:
         ws_presenze.append_rows(righe_da_aggiungere)
@@ -404,7 +404,7 @@ def calcola_riepilogo(df, df_feste):
         return pd.DataFrame(), df_valido
 
     df_valido["trimestre"] = df_valido["data"].dt.to_period("Q").astype(str)
-    df_valido["codice"] = df_valido["stato"].map(CODICI).fillna(df_valido["stato"])
+    df_valido["codice"] = df_valido["giustificativo"].map(CODICI).fillna(df_valido["giustificativo"])
 
     riepilogo = (
         df_valido
@@ -476,7 +476,7 @@ def abbrevia_persona(nome):
 
 
 def render_calendario_mese(df, df_feste, anno, mese):
-    'Calendario del mese corrente: mostra solo MAR/ROB colorati in base allo stato.'
+    'Calendario del mese corrente: mostra solo MAR/ROB colorati in base al giustificativo.'
     mesi_it = [
         'GENNAIO', 'FEBBRAIO', 'MARZO', 'APRILE', 'MAGGIO', 'GIUGNO',
         'LUGLIO', 'AGOSTO', 'SETTEMBRE', 'OTTOBRE', 'NOVEMBRE', 'DICEMBRE'
@@ -489,7 +489,7 @@ def render_calendario_mese(df, df_feste, anno, mese):
         tmp = df.copy()
         tmp['data'] = pd.to_datetime(tmp['data'], errors='coerce').dt.date
         tmp = tmp.dropna(subset=['data'])
-        tmp['codice'] = tmp['stato'].map(CODICI).fillna(tmp['stato'])
+        tmp['codice'] = tmp['giustificativo'].map(CODICI).fillna(tmp['giustificativo'])
 
         for _, r in tmp.iterrows():
             lookup[(r['data'], r['persona'])] = r['codice']
@@ -705,7 +705,7 @@ def genera_excel_formattato(df, df_feste, riepilogo, anno):
     presenze = df.copy()
     if not presenze.empty:
         presenze["data"] = pd.to_datetime(presenze["data"]).dt.date
-        presenze["codice"] = presenze["stato"].map(CODICI).fillna(presenze["stato"])
+        presenze["codice"] = presenze["giustificativo"].map(CODICI).fillna(presenze["giustificativo"])
         lookup = {(r["data"], r["persona"]): r["codice"] for _, r in presenze.iterrows()}
     else:
         lookup = {}
@@ -862,7 +862,7 @@ def genera_pdf_presenze(df, df_feste, anno):
     presenze = df.copy()
     if not presenze.empty:
         presenze["data"] = pd.to_datetime(presenze["data"]).dt.date
-        presenze["codice"] = presenze["stato"].map(CODICI).fillna(presenze["stato"])
+        presenze["codice"] = presenze["giustificativo"].map(CODICI).fillna(presenze["giustificativo"])
         lookup = {(r["data"], r["persona"]): r["codice"] for _, r in presenze.iterrows()}
     else:
         lookup = {}
@@ -958,13 +958,13 @@ with tab1:
 
     giorno = st.date_input("Data", value=date.today())
     persona = st.selectbox("Persona", PERSONE)
-    stato = st.selectbox("Stato", STATI, format_func=lambda x: f"{codice_stato(x)} — {x}")
+    giustificativo = st.selectbox("giustificativo", STATI, format_func=lambda x: f"{codice_giustificativo(x)} — {x}")
 
     if is_giorno_bloccato(giorno, df_feste):
         st.warning("Questo giorno è weekend o festività. Non va compilato e non entra nel conteggio.")
     else:
         if st.button("Salva presenza", width="stretch"):
-            nuova_riga = pd.DataFrame([{"data": pd.to_datetime(giorno), "persona": persona, "stato": stato}])
+            nuova_riga = pd.DataFrame([{"data": pd.to_datetime(giorno), "persona": persona, "giustificativo": giustificativo}])
 
             df = df[~((df["data"] == pd.to_datetime(giorno)) & (df["persona"] == persona))]
             df = pd.concat([df, nuova_riga], ignore_index=True)
