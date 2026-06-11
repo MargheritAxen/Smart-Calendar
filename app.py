@@ -1186,31 +1186,35 @@ with tab3:
     anno_selezionato = st.selectbox("Anno da esportare", anni_disponibili)
     df_anno = df[df["data"].dt.year == anno_selezionato].copy()
 
-    csv_export = df_anno.to_csv(index=False).encode("utf-8")
-
     excel_formattato = genera_excel_formattato(df_anno, df_feste, riepilogo, anno=int(anno_selezionato))
     pdf_presenze = genera_pdf_presenze(df_anno, df_feste, anno=int(anno_selezionato))
 
-    st.download_button(
-        "Scarica CSV",
-        data=csv_export,
-        file_name=f"smart_calendar_{anno_selezionato}.csv",
-        mime="text/csv",
-        width="stretch"
-    )
+    st.markdown("### 📤 Esportazioni")
 
-    st.download_button(
-        "Scarica Excel",
-        data=excel_formattato,
-        file_name=f"smart_calendar_{anno_selezionato}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        width="stretch"
-    )
+    with st.expander("📊 Excel", expanded=False):
+        st.write(
+            "Su iPhone il file potrebbe aprirsi in Numbers o File. "
+            "Chiudi l'anteprima per tornare all'app."
+        )
 
-    st.download_button(
-        "Scarica PDF",
-        data=pdf_presenze,
-        file_name=f"smart_calendar_{anno_selezionato}_presenze.pdf",
-        mime="application/pdf",
-        width="stretch"
-    )
+        st.download_button(
+            "⬇️ Scarica Excel",
+            data=excel_formattato,
+            file_name=f"smart_calendar_{anno_selezionato}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            width="stretch"
+        )
+
+    with st.expander("📄 PDF", expanded=False):
+        st.write(
+            "Su iPhone il PDF può aprirsi in anteprima. "
+            "Premi 'Fine' per tornare all'app."
+        )
+
+        st.download_button(
+            "⬇️ Scarica PDF",
+            data=pdf_presenze,
+            file_name=f"smart_calendar_{anno_selezionato}_presenze.pdf",
+            mime="application/pdf",
+            width="stretch"
+        )
