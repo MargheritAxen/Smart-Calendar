@@ -1044,37 +1044,23 @@ with tab1:
 
     st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
 
-    st.markdown(
-        f"""
-        <div style="
-            text-align:center;
-            font-size:0.90rem;
-            font-weight:700;
-            color:#9ca3af;
-            margin-bottom:8px;
-        ">
-            📅 {calendar.month_name[int(st.session_state.cal_mese)]} {int(st.session_state.cal_anno)}
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    col_prev, col_next = st.columns(2)
+    col_prev, col_today, col_next = st.columns([1, 1, 1])
 
     with col_prev:
-        if st.button("◀ Mese precedente", use_container_width=True):
+        if st.button("◀", use_container_width=True):
             cambia_mese(-1)
             st.rerun()
 
-    with col_next:
-        if st.button("Mese successivo ▶", use_container_width=True):
-            cambia_mese(1)
+    with col_today:
+        if st.button("Oggi", use_container_width=True):
+            st.session_state.cal_anno = oggi.year
+            st.session_state.cal_mese = oggi.month
             st.rerun()
 
-    if st.button("📍 Torna ad oggi", use_container_width=True):
-        st.session_state.cal_anno = oggi.year
-        st.session_state.cal_mese = oggi.month
-        st.rerun()
+    with col_next:
+        if st.button("▶", use_container_width=True):
+            cambia_mese(1)
+            st.rerun()
             
     render_calendario_mese(
         df,
