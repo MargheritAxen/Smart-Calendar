@@ -276,6 +276,10 @@ def leggi_presenze_cache():
         return pd.DataFrame(columns=["data", "persona", "giustificativo"])
 
     df = pd.DataFrame(dati)
+
+    if "stato" in df.columns and "giustificativo" not in df.columns:
+        df = df.rename(columns={"stato": "giustificativo"})
+
     df["data"] = pd.to_datetime(df["data"], errors="coerce")
     df = df.dropna(subset=["data"])
     return df
