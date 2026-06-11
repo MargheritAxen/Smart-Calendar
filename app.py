@@ -349,15 +349,34 @@ def calcola_riepilogo(df, df_feste):
 
 
 def render_legenda():
-    html = '<div class="legend-row">'
-    for codice in ["UFF", "LAW", "FER", "MAL", "JOE", "LIB"]:
-        color = COLORI[codice]
-        html += f'<span class="legend-chip" style="background:{color};color:#000000;">{codice}</span>'
-    html += '</div>'
-    st.markdown(html, unsafe_allow_html=True)
+    """Legenda stabile come tabella, senza HTML libero."""
+    legenda = pd.DataFrame([
+        {"Codice": "UFF", "Significato": "Presenza / ufficio", "Conteggio": "Sì"},
+        {"Codice": "LAW", "Significato": "Smart working", "Conteggio": "Sì"},
+        {"Codice": "FER", "Significato": "Ferie", "Conteggio": "No"},
+        {"Codice": "MAL", "Significato": "Malattia", "Conteggio": "No"},
+        {"Codice": "JOE", "Significato": "Jolly", "Conteggio": "No"},
+        {"Codice": "LIB", "Significato": "Weekend / festività", "Conteggio": "No"},
+    ])
+
+    def stile_legenda(row):
+        colore = COLORI.get(row["Codice"], "#ffffff")
+        return [
+            f"background-color: {colore}; color: #000000; font-weight: bold; text-align: center;",
+            "text-align: left;",
+            "text-align: center; font-weight: bold;",
+        ]
+
+    st.caption("Legenda")
+    st.dataframe(
+        legenda.style.apply(stile_legenda, axis=1),
+        hide_index=True,
+        width="stretch"
+    )
 
 
 def render_calendario_mese(df, df_feste, persona, anno, mese):
+    """Calendario mensile stabile e leggibile, senza HTML renderizzato male."""
     mesi_it = [
         "GENNAIO", "FEBBRAIO", "MARZO", "APRILE", "MAGGIO", "GIUGNO",
         "LUGLIO", "AGOSTO", "SETTEMBRE", "OTTOBRE", "NOVEMBRE", "DICEMBRE"
@@ -367,37 +386,56 @@ def render_calendario_mese(df, df_feste, persona, anno, mese):
     lookup = {}
     if not df.empty:
         tmp = df.copy()
-        tmp["data"] = pd.to_datetime(tmp["data"]).dt.date
+        tmp["data"] = pd.to_datetime(tmp["data"], errors="coerce").dt.date
+        tmp = tmp.dropna(subset=["data"])
         tmp["codice"] = tmp["stato"].map(CODICI).fillna(tmp["stato"])
         tmp = tmp[tmp["persona"] == persona]
         lookup = {r["data"]: r["codice"] for _, r in tmp.iterrows()}
 
     primo_giorno, giorni_mese = calendar.monthrange(anno, mese)
 
-    html = f'<div class="month-title">{mesi_it[mese - 1]} {anno}</div>'
-    html += '<div class="mobile-calendar">'
-    for g in giorni:
-        html += f'<div class="day-head">{g}</div>'
-
-    for _ in range(primo_giorno):
-        html += '<div class="day-cell" style="opacity:0.25;"></div>'
+    settimane = []
+    settimana = ["" for _ in range(7)]
 
     for day in range(1, giorni_mese + 1):
         data = date(anno, mese, day)
+        weekday = data.weekday()
         bloccato = is_giorno_bloccato(data, df_feste)
         codice = "LIB" if bloccato else lookup.get(data, "")
-        bg = COLORI.get(codice, "rgba(255,255,255,0.04)")
-        color = "#000000" if codice else "inherit"
+        testo = str(day) if codice == "" else f"{day}\n{codice}"
+        settimana[weekday] = testo
 
-        html += f"""
-        <div class="day-cell" style="background:{bg};color:{color};">
-            <div class="day-num">{day}</div>
-            <span class="day-code">{codice}</span>
-        </div>
-        """
+        if weekday == 6:
+            settimane.append(settimana)
+            settimana = ["" for _ in range(7)]
 
-    html += '</div>'
-    st.markdown(html, unsafe_allow_html=True)
+    if any(x != "" for x in settimana):
+        settimane.append(settimana)
+
+    calendario_df = pd.DataFrame(settimane, columns=giorni)
+
+    def colore_cella(valore):
+        testo = str(valore)
+        if "LIB" in testo:
+            return "background-color: #d9d9d9; color: #000000; font-weight: bold; text-align: center; white-space: pre-line;"
+        if "UFF" in testo:
+            return "background-color: #ff8a00; color: #000000; font-weight: bold; text-align: center; white-space: pre-line;"
+        if "LAW" in testo:
+            return "background-color: #19e635; color: #000000; font-weight: bold; text-align: center; white-space: pre-line;"
+        if "FER" in testo:
+            return "background-color: #8a078a; color: #ffffff; font-weight: bold; text-align: center; white-space: pre-line;"
+        if "MAL" in testo:
+            return "background-color: #fff200; color: #000000; font-weight: bold; text-align: center; white-space: pre-line;"
+        if "JOE" in testo:
+            return "background-color: #6f42c1; color: #ffffff; font-weight: bold; text-align: center; white-space: pre-line;"
+        return "text-align: center; white-space: pre-line;"
+
+    st.markdown(f"### {mesi_it[mese - 1]} {anno}")
+    st.dataframe(
+        calendario_df.style.map(colore_cella),
+        hide_index=True,
+        width="stretch"
+    )
 
 
 def genera_excel_formattato(df, df_feste, riepilogo, anno):
