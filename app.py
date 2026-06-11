@@ -6,6 +6,7 @@ from google.oauth2.service_account import Credentials
 from datetime import date, timedelta
 from io import BytesIO
 import calendar
+import streamlit.components.v1 as components
 
 st.set_page_config(
     page_title="Smart Calendar",
@@ -505,12 +506,6 @@ def render_calendario_mese(df, df_feste, anno, mese):
         "MAL": "#fff200",
         "JOE": "#6f42c1",
         "LIB": "#d9d9d9",
-        "EMPTY": "transparent",
-    }
-
-    testo_colore = {
-        "FER": "#ffffff",
-        "JOE": "#ffffff",
     }
 
     _, giorni_mese = calendar.monthrange(anno, mese)
@@ -525,8 +520,8 @@ def render_calendario_mese(df, df_feste, anno, mese):
 
         if bloccato:
             contenuto = f"""
-            <div class="day-number">{day}</div>
-            <span class="pres-row">LIB</span>
+                <div class="day-number">{day}</div>
+                <div class="pres-row">LIB</div>
             """
             colore_bg = colori["LIB"]
             colore_txt = "#000000"
@@ -536,28 +531,29 @@ def render_calendario_mese(df, df_feste, anno, mese):
 
             for persona in PERSONE:
                 codice = lookup.get((data_giorno, persona), "")
+
                 if codice:
                     nome_breve = abbrevia_persona(persona)
-                    righe.append(f'<span class="pres-row">{nome_breve} {codice}</span>')
+                    righe.append(f'<div class="pres-row">{nome_breve} {codice}</div>')
                     codici_presenti.append(codice)
 
             contenuto = "".join(righe)
 
             if len(set(codici_presenti)) == 1 and codici_presenti:
                 codice_bg = codici_presenti[0]
-                colore_bg = colori.get(codice_bg, colori["EMPTY"])
-                colore_txt = testo_colore.get(codice_bg, "#000000")
+                colore_bg = colori.get(codice_bg, "#111827")
+                colore_txt = "#ffffff" if codice_bg in ["FER", "JOE"] else "#000000"
             elif len(set(codici_presenti)) > 1:
-                colore_bg = "rgba(255,255,255,0.08)"
+                colore_bg = "#374151"
                 colore_txt = "#ffffff"
             else:
-                colore_bg = "transparent"
+                colore_bg = "#111827"
                 colore_txt = "#ffffff"
 
         settimana[weekday] = f"""
-        <td style="background:{colore_bg}; color:{colore_txt};">
-            {contenuto}
-        </td>
+            <td style="background:{colore_bg}; color:{colore_txt};">
+                {contenuto}
+            </td>
         """
 
         if weekday == 6:
@@ -568,7 +564,89 @@ def render_calendario_mese(df, df_feste, anno, mese):
         settimane.append(settimana)
 
     html = f"""
+    <style>
+        body {{
+            margin: 0;
+            background: transparent;
+            font-family: Arial, sans-serif;
+            color: white;
+        }}
+
+        .month-title {{
+            font-size: 26px;
+            font-weight: 900;
+            margin: 0 0 12px 0;
+            color: white;
+        }}
+
+        .calendar-table {{
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            overflow: hidden;
+            border-radius: 10px;
+        }}
+
+        .calendar-table th {{
+            padding: 9px 4px;
+            background: #1f2937;
+            color: #d1d5db;
+            text-align: center;
+            font-size: 13px;
+            border: 1px solid #374151;
+        }}
+
+        .calendar-table td {{
+            height: 82px;
+            vertical-align: top;
+            padding: 6px;
+            border: 1px solid #374151;
+            font-weight: 800;
+            font-size: 12px;
+            box-sizing: border-box;
+        }}
+
+        .day-number {{
+            font-size: 13px;
+            font-weight: 900;
+            margin-bottom: 5px;
+        }}
+
+        .pres-row {{
+            display: block;
+            line-height: 17px;
+            white-space: nowrap;
+        }}
+
+        @media (max-width: 600px) {{
+            .month-title {{
+                font-size: 22px;
+            }}
+
+            .calendar-table th {{
+                font-size: 11px;
+                padding: 7px 2px;
+            }}
+
+            .calendar-table td {{
+                height: 72px;
+                padding: 4px;
+                font-size: 10px;
+            }}
+
+            .day-number {{
+                font-size: 11px;
+                margin-bottom: 4px;
+            }}
+
+            .pres-row {{
+                line-height: 14px;
+            }}
+        }}
+    </style>
+
     <div class="month-title">{mesi_it[mese - 1]} {anno}</div>
+
     <table class="calendar-table">
         <thead>
             <tr>
@@ -589,7 +667,9 @@ def render_calendario_mese(df, df_feste, anno, mese):
     </table>
     """
 
-    st.markdown(html, unsafe_allow_html=True)
+    components.html(html, height=560, scrolling=False)
+
+
 def genera_excel_formattato(df, df_feste, riepilogo, anno):
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
