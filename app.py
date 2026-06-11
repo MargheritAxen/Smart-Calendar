@@ -962,7 +962,7 @@ with tab1:
 
     giorno = st.date_input("Data", value=date.today())
     persona = st.selectbox("Persona", PERSONE)
-    giustificativo = st.selectbox("giustificativo", STATI, format_func=lambda x: f"{codice_giustificativo(x)} — {x}")
+    giustificativo = st.selectbox("Giustificativo", STATI, format_func=lambda x: f"{codice_giustificativo(x)} — {x}")
 
     if is_giorno_bloccato(giorno, df_feste):
         st.warning("Questo giorno è weekend o festività. Non va compilato e non entra nel conteggio.")
