@@ -1042,25 +1042,78 @@ with tab1:
 
     render_legenda()
 
+    nav_action = st.query_params.get("nav")
+
+    if nav_action == "prev":
+        cambia_mese(-1)
+        st.query_params.clear()
+        st.rerun()
+
+    if nav_action == "today":
+        st.session_state.cal_anno = oggi.year
+        st.session_state.cal_mese = oggi.month
+        st.query_params.clear()
+        st.rerun()
+
+    if nav_action == "next":
+        cambia_mese(1)
+        st.query_params.clear()
+        st.rerun()
+
     st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
 
-    col_prev, col_today, col_next = st.columns([1, 1, 1])
+    st.markdown(
+        """
+        <style>
+        .month-nav-row {
+            display: flex;
+            flex-direction: row;
+            gap: 6px;
+            width: 100%;
+            margin: 8px 0 12px 0;
+        }
 
-    with col_prev:
-        if st.button("◀", use_container_width=True):
-            cambia_mese(-1)
-            st.rerun()
+        .month-nav-row a {
+            flex: 1;
+            display: block;
+            text-align: center;
+            text-decoration: none;
+            color: #ffffff !important;
+            background: #111827;
+            border: 1px solid #4b5563;
+            border-radius: 10px;
+            padding: 10px 4px;
+            font-size: 0.85rem;
+            font-weight: 800;
+            line-height: 1.1rem;
+        }
 
-    with col_today:
-        if st.button("Oggi", use_container_width=True):
-            st.session_state.cal_anno = oggi.year
-            st.session_state.cal_mese = oggi.month
-            st.rerun()
+        .month-nav-row a:hover {
+            background: #1f2937;
+            border-color: #6b7280;
+        }
 
-    with col_next:
-        if st.button("▶", use_container_width=True):
-            cambia_mese(1)
-            st.rerun()
+        @media (max-width: 600px) {
+            .month-nav-row {
+                gap: 4px;
+            }
+
+            .month-nav-row a {
+                font-size: 0.78rem;
+                padding: 9px 2px;
+                border-radius: 9px;
+            }
+        }
+        </style>
+
+        <div class="month-nav-row">
+            <a href="?nav=prev">◀</a>
+            <a href="?nav=today">Oggi</a>
+            <a href="?nav=next">▶</a>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
             
     render_calendario_mese(
         df,
