@@ -1025,7 +1025,24 @@ with tab1:
         st.session_state.cal_mese = nuovo_mese
         st.session_state.cal_anno = nuovo_anno
 
+    st.markdown(
+    """
+    <div style="
+        font-size:0.90rem;
+        font-weight:700;
+        color:#d1d5db;
+        margin-bottom:6px;
+        margin-top:4px;
+    ">
+        📖 LEGENDA
+    </div>
+    """,
+    unsafe_allow_html=True
+    )
+
     render_legenda()
+
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
     col_prev, col_today, col_next = st.columns([1, 1, 1])
 
@@ -1044,7 +1061,7 @@ with tab1:
         if st.button("▶", width="stretch"):
             cambia_mese(1)
             st.rerun()
-
+            
     render_calendario_mese(
         df,
         df_feste,
