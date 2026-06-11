@@ -481,32 +481,40 @@ def abbrevia_persona(nome):
 
 
 def render_calendario_mese(df, df_feste, anno, mese):
-    """Calendario del mese corrente: solo colori, senza scritte nelle celle."""
+    'Calendario del mese corrente: mostra solo MAR/ROB colorati in base allo stato.'
     mesi_it = [
-        "GENNAIO", "FEBBRAIO", "MARZO", "APRILE", "MAGGIO", "GIUGNO",
-        "LUGLIO", "AGOSTO", "SETTEMBRE", "OTTOBRE", "NOVEMBRE", "DICEMBRE"
+        'GENNAIO', 'FEBBRAIO', 'MARZO', 'APRILE', 'MAGGIO', 'GIUGNO',
+        'LUGLIO', 'AGOSTO', 'SETTEMBRE', 'OTTOBRE', 'NOVEMBRE', 'DICEMBRE'
     ]
 
-    giorni = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"]
+    giorni = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom']
 
     lookup = {}
     if not df.empty:
         tmp = df.copy()
-        tmp["data"] = pd.to_datetime(tmp["data"], errors="coerce").dt.date
-        tmp = tmp.dropna(subset=["data"])
-        tmp["codice"] = tmp["stato"].map(CODICI).fillna(tmp["stato"])
+        tmp['data'] = pd.to_datetime(tmp['data'], errors='coerce').dt.date
+        tmp = tmp.dropna(subset=['data'])
+        tmp['codice'] = tmp['stato'].map(CODICI).fillna(tmp['stato'])
 
         for _, r in tmp.iterrows():
-            lookup[(r["data"], r["persona"])] = r["codice"]
+            lookup[(r['data'], r['persona'])] = r['codice']
 
     colori = {
-        "UFF": "#ff8a00",
-        "LAW": "#19e635",
-        "FER": "#8a078a",
-        "MAL": "#fff200",
-        "JOE": "#6f42c1",
-        "LIB": "#d9d9d9",
-        "EMPTY": "#111827",
+        'UFF': '#ff8a00',
+        'LAW': '#19e635',
+        'FER': '#8a078a',
+        'MAL': '#fff200',
+        'JOE': '#6f42c1',
+        'LIB': '#d9d9d9',
+        'EMPTY': '#111827',
+    }
+
+    testo_colore = {
+        'UFF': '#000000',
+        'LAW': '#000000',
+        'FER': '#ffffff',
+        'MAL': '#000000',
+        'JOE': '#ffffff',
     }
 
     _, giorni_mese = calendar.monthrange(anno, mese)
@@ -521,39 +529,27 @@ def render_calendario_mese(df, df_feste, anno, mese):
 
         if bloccato:
             contenuto = f'<div class="day-number dark-number">{day}</div>'
-            colore_bg = colori["LIB"]
-            colore_txt = "#000000"
+            colore_bg = colori['LIB']
+            colore_txt = '#000000'
         else:
-            codici_presenti = []
-            chips = []
+            righe = [f'<div class="day-number">{day}</div>']
 
             for persona in PERSONE:
-                codice = lookup.get((data_giorno, persona), "")
+                codice = lookup.get((data_giorno, persona), '')
                 if codice:
-                    codici_presenti.append(codice)
-                    colore_chip = colori.get(codice, colori["EMPTY"])
-                    chips.append(f'<div class="person-chip" style="background:{colore_chip};"></div>')
+                    nome_breve = abbrevia_persona(persona)
+                    colore_nome = colori.get(codice, colori['EMPTY'])
+                    colore_testo = testo_colore.get(codice, '#ffffff')
+                    righe.append(
+                        f'<div class="name-chip" style="background:{colore_nome}; color:{colore_testo};">{nome_breve}</div>'
+                    )
 
-            if len(set(codici_presenti)) == 1 and codici_presenti:
-                colore_bg = colori.get(codici_presenti[0], colori["EMPTY"])
-                colore_txt = "#ffffff" if codici_presenti[0] in ["FER", "JOE"] else "#000000"
-            elif len(set(codici_presenti)) > 1:
-                colore_bg = colori["EMPTY"]
-                colore_txt = "#ffffff"
-            else:
-                colore_bg = colori["EMPTY"]
-                colore_txt = "#ffffff"
+            contenuto = ''.join(righe)
+            colore_bg = colori['EMPTY']
+            colore_txt = '#ffffff'
 
-            contenuto = f'''
-                <div class="day-number">{day}</div>
-                <div class="chip-wrap">{''.join(chips)}</div>
-            '''
-
-        settimana[weekday] = f'''
-            <td style="background:{colore_bg}; color:{colore_txt};">
-                {contenuto}
-            </td>
-        '''
+        cella = f'<td style="background:{colore_bg}; color:{colore_txt};">{contenuto}</td>'
+        settimana[weekday] = cella
 
         if weekday == 6:
             settimane.append(settimana)
@@ -561,6 +557,8 @@ def render_calendario_mese(df, df_feste, anno, mese):
 
     if any(x is not None for x in settimana):
         settimane.append(settimana)
+
+    intestazione_giorni = ''.join([f'<th>{g}</th>' for g in giorni])
 
     html = f'''
     <style>
@@ -604,26 +602,26 @@ def render_calendario_mese(df, df_feste, anno, mese):
         }}
 
         .day-number {{
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 900;
-            margin-bottom: 10px;
+            margin-bottom: 7px;
         }}
 
         .dark-number {{
             color: #000000;
         }}
 
-        .chip-wrap {{
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
+        .name-chip {{
+            display: block;
             width: 100%;
-        }}
-
-        .person-chip {{
-            height: 14px;
-            border-radius: 999px;
-            border: 1px solid rgba(0,0,0,0.25);
+            border-radius: 8px;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 900;
+            line-height: 18px;
+            margin-bottom: 5px;
+            border: 1px solid rgba(0,0,0,0.28);
+            box-sizing: border-box;
         }}
 
         @media (max-width: 600px) {{
@@ -637,17 +635,20 @@ def render_calendario_mese(df, df_feste, anno, mese):
             }}
 
             .calendar-table td {{
-                height: 70px;
+                height: 72px;
                 padding: 4px;
             }}
 
             .day-number {{
                 font-size: 11px;
-                margin-bottom: 8px;
+                margin-bottom: 5px;
             }}
 
-            .person-chip {{
-                height: 11px;
+            .name-chip {{
+                font-size: 10px;
+                line-height: 15px;
+                margin-bottom: 4px;
+                border-radius: 6px;
             }}
         }}
     </style>
@@ -656,18 +657,16 @@ def render_calendario_mese(df, df_feste, anno, mese):
 
     <table class="calendar-table">
         <thead>
-            <tr>
-                {''.join([f'<th>{g}</th>' for g in giorni])}
-            </tr>
+            <tr>{intestazione_giorni}</tr>
         </thead>
         <tbody>
     '''
 
     for settimana in settimane:
-        html += "<tr>"
+        html += '<tr>'
         for cella in settimana:
-            html += cella if cella is not None else "<td></td>"
-        html += "</tr>"
+            html += cella if cella is not None else '<td></td>'
+        html += '</tr>'
 
     html += '''
         </tbody>
@@ -675,7 +674,6 @@ def render_calendario_mese(df, df_feste, anno, mese):
     '''
 
     components.html(html, height=560, scrolling=False)
-
 
 def genera_excel_formattato(df, df_feste, riepilogo, anno):
     from openpyxl import Workbook
