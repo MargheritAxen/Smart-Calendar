@@ -41,7 +41,6 @@ COLORI = {
     "FER": "#8a078a",
     "MAL": "#fff200",
     "JOL": "#6f42c1",
-    "LIB": "#d9d9d9",
 }
 
 st.markdown("""
@@ -60,7 +59,7 @@ st.markdown("""
 
 .legend-compact {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 4px;
     margin: 6px 0 8px 0;
 }
@@ -199,7 +198,7 @@ def inizializza_fogli():
 
         return worksheet
 
-    ws_presenze = crea_o_prendi(FOGLIO_PRESENZE, ["data", "persona", "stato"])
+    ws_presenze = crea_o_prendi(FOGLIO_PRESENZE, ["data", "persona", "giustificativo"])
     ws_feste = crea_o_prendi(FOGLIO_FESTE, ["data", "descrizione"])
     ws_riepilogo = crea_o_prendi(
         FOGLIO_RIEPILOGO,
@@ -465,10 +464,6 @@ def render_legenda():
             <div class="legend-code" style="background:#6f42c1;color:white;">JOL</div>
             <div class="legend-desc">Jolly</div>
         </div>
-        <div class="legend-item">
-            <div class="legend-code" style="background:#d9d9d9;">LIB</div>
-            <div class="legend-desc">Festivo</div>
-        </div>
     </div>
     """, unsafe_allow_html=True)
 def abbrevia_persona(nome):
@@ -505,7 +500,6 @@ def render_calendario_mese(df, df_feste, anno, mese):
         'FER': '#8a078a',
         'MAL': '#fff200',
         'JOL': '#6f42c1',
-        'LIB': '#d9d9d9',
         'EMPTY': '#111827',
     }
 
@@ -528,9 +522,9 @@ def render_calendario_mese(df, df_feste, anno, mese):
         bloccato = is_giorno_bloccato(data_giorno, df_feste)
 
         if bloccato:
-            contenuto = f'<div class="day-number dark-number">{day}</div>'
-            colore_bg = colori['LIB']
-            colore_txt = '#000000'
+            contenuto = f'<div class="day-number">{day}</div>'
+            colore_bg = colori['EMPTY']
+            colore_txt = '#ffffff'
         else:
             righe = [f'<div class="day-number">{day}</div>']
 
@@ -704,7 +698,6 @@ def genera_excel_formattato(df, df_feste, riepilogo, anno):
     fill_fer = PatternFill("solid", fgColor="D5A6BD")
     fill_mal = PatternFill("solid", fgColor="FFF2CC")
     fill_jol = PatternFill("solid", fgColor="D9D2E9")
-    fill_lib = PatternFill("solid", fgColor="D9D9D9")
 
     thin = Side(style="thin", color="B7B7B7")
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
@@ -725,7 +718,6 @@ def genera_excel_formattato(df, df_feste, riepilogo, anno):
         ("FER", "Ferie - non conta"),
         ("MAL", "Malattia - non conta"),
         ("JOL", "Jolly - non conta"),
-        ("LIB", "Giorno libero/festivo - non conta"),
     ]
     for i, (codice, descrizione) in enumerate(legenda, start=2):
         ws[f"A{i}"] = codice
@@ -743,7 +735,6 @@ def genera_excel_formattato(df, df_feste, riepilogo, anno):
         "FER": fill_fer,
         "MAL": fill_mal,
         "JOL": fill_jol,
-        "LIB": fill_lib,
     }
 
     for month in range(1, 13):
@@ -773,7 +764,7 @@ def genera_excel_formattato(df, df_feste, riepilogo, anno):
 
             values = [day, giorni_it[weekday]]
             for persona in persone:
-                values.append("LIB" if weekday >= 5 or is_festivo else lookup.get((data, persona), ""))
+                values.append("" if weekday >= 5 or is_festivo else lookup.get((data, persona), ""))
 
             for j, value in enumerate(values):
                 cell = ws.cell(row, block_col + j, value)
@@ -865,7 +856,6 @@ def genera_pdf_presenze(df, df_feste, anno):
         "FER": colors.HexColor("#D5A6BD"),
         "MAL": colors.HexColor("#FFF2CC"),
         "JOL": colors.HexColor("#D9D2E9"),
-        "LIB": colors.HexColor("#D9D9D9"),
         "HEADER": colors.HexColor("#EEEEEE"),
     }
 
@@ -883,7 +873,7 @@ def genera_pdf_presenze(df, df_feste, anno):
 
         legenda_pdf = "   ".join([
             "UFF = Presenza", "LAW = Smart", "FER = Ferie",
-            "MAL = Malattia", "JOL = Jolly", "LIB = Libero/Festivo"
+            "MAL = Malattia", "JOL = Jolly"
         ])
         elementi.append(Paragraph(legenda_pdf, small_style))
         elementi.append(Spacer(1, 8))
@@ -900,8 +890,8 @@ def genera_pdf_presenze(df, df_feste, anno):
             wd = data.weekday()
 
             if is_giorno_bloccato(data, df_feste):
-                testo = f"<b>{day}</b><br/>LIB"
-                code_for_bg = "LIB"
+                testo = f"<b>{day}</b>"
+                code_for_bg = ""
             else:
                 righe = [f"<b>{day}</b>"]
                 codici_presenti = []
@@ -971,7 +961,7 @@ with tab1:
     stato = st.selectbox("Stato", STATI, format_func=lambda x: f"{codice_stato(x)} — {x}")
 
     if is_giorno_bloccato(giorno, df_feste):
-        st.warning("Questo giorno è LIB: weekend o festività. Non va compilato e non entra nel conteggio.")
+        st.warning("Questo giorno è weekend o festività. Non va compilato e non entra nel conteggio.")
     else:
         if st.button("Salva presenza", width="stretch"):
             nuova_riga = pd.DataFrame([{"data": pd.to_datetime(giorno), "persona": persona, "stato": stato}])
