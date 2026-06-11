@@ -45,17 +45,110 @@ COLORI = {
 
 st.markdown("""
 <style>
-.block-container { padding-top: 1.3rem; max-width: 760px; }
-.smart-title { font-size: 2.4rem; font-weight: 800; margin-bottom: 0.2rem; }
-.legend-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 20px 0; }
-.legend-chip { padding: 7px 10px; border-radius: 999px; font-weight: 800; font-size: 0.82rem; border: 1px solid rgba(255,255,255,0.18); }
-.month-title { text-align: center; font-size: 1.6rem; font-weight: 800; margin: 14px 0 10px 0; }
-.mobile-calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; width: 100%; }
-.day-head { text-align: center; font-weight: 800; padding: 7px 0; background: rgba(255,255,255,0.08); border-radius: 7px; }
-.day-cell { min-height: 68px; border-radius: 8px; padding: 5px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.10); overflow: hidden; }
-.day-num { font-weight: 900; font-size: 0.9rem; margin-bottom: 4px; }
-.day-code { display: block; text-align: center; font-weight: 900; font-size: 1rem; line-height: 1.1rem; }
-.last-card { padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.09); margin-bottom: 8px; }
+.block-container {
+    padding-top: 2.2rem;
+    max-width: 820px;
+}
+
+.smart-title {
+    font-size: 2rem;
+    font-weight: 800;
+    margin-bottom: 0.8rem;
+    line-height: 1.2;
+}
+
+.legend-compact {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 6px;
+    margin: 8px 0 20px 0;
+}
+
+.legend-item {
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.18);
+    text-align: center;
+    font-size: 0.72rem;
+}
+
+.legend-code {
+    font-weight: 900;
+    padding: 5px 3px;
+    color: #000;
+}
+
+.legend-desc {
+    padding: 5px 3px;
+    background: rgba(255,255,255,0.05);
+    font-size: 0.68rem;
+    min-height: 28px;
+}
+
+.month-title {
+    font-size: 1.45rem;
+    font-weight: 900;
+    margin: 22px 0 10px 0;
+}
+
+.calendar-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 0.78rem;
+}
+
+.calendar-table th {
+    padding: 8px 4px;
+    background: rgba(255,255,255,0.08);
+    text-align: left;
+    font-weight: 800;
+    color: rgba(255,255,255,0.75);
+}
+
+.calendar-table td {
+    height: 78px;
+    vertical-align: top;
+    padding: 6px;
+    border: 1px solid rgba(255,255,255,0.12);
+    font-weight: 800;
+}
+
+.day-number {
+    font-size: 0.78rem;
+    margin-bottom: 4px;
+}
+
+.pres-row {
+    display: block;
+    font-size: 0.72rem;
+    line-height: 1.1rem;
+    white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+    .legend-compact {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .smart-title {
+        font-size: 1.7rem;
+    }
+
+    .calendar-table {
+        font-size: 0.68rem;
+    }
+
+    .calendar-table td {
+        height: 70px;
+        padding: 4px;
+    }
+
+    .pres-row {
+        font-size: 0.62rem;
+        line-height: 0.95rem;
+    }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -349,47 +442,34 @@ def calcola_riepilogo(df, df_feste):
 
 
 def render_legenda():
-    """Legenda compatta come tabella piccola, senza colonna conteggio."""
     st.markdown("""
-<style>
-.legend-table{
-    width: 430px;
-    max-width: 100%;
-    border-collapse: collapse;
-    margin: 6px 0 18px 0;
-    font-size: 13px;
-}
-.legend-table td{
-    padding: 6px 10px;
-    border: 1px solid rgba(255,255,255,0.16);
-}
-.legend-code{
-    width: 72px;
-    text-align: center;
-    font-weight: 900;
-    color: #000000;
-}
-.legend-desc{
-    font-weight: 600;
-}
-.leg-uff{background:#ff8a00;}
-.leg-law{background:#19e635;}
-.leg-fer{background:#8a078a;color:#ffffff;}
-.leg-mal{background:#fff200;}
-.leg-joe{background:#6f42c1;color:#ffffff;}
-.leg-lib{background:#d9d9d9;}
-</style>
-<table class="legend-table">
-<tr><td class="legend-code leg-uff">UFF</td><td class="legend-desc">Presenza / ufficio</td></tr>
-<tr><td class="legend-code leg-law">LAW</td><td class="legend-desc">Smart working</td></tr>
-<tr><td class="legend-code leg-fer">FER</td><td class="legend-desc">Ferie</td></tr>
-<tr><td class="legend-code leg-mal">MAL</td><td class="legend-desc">Malattia</td></tr>
-<tr><td class="legend-code leg-joe">JOE</td><td class="legend-desc">Jolly</td></tr>
-<tr><td class="legend-code leg-lib">LIB</td><td class="legend-desc">Weekend / festività</td></tr>
-</table>
-""", unsafe_allow_html=True)
-
-
+    <div class="legend-compact">
+        <div class="legend-item">
+            <div class="legend-code" style="background:#ff8a00;">UFF</div>
+            <div class="legend-desc">Ufficio</div>
+        </div>
+        <div class="legend-item">
+            <div class="legend-code" style="background:#19e635;">LAW</div>
+            <div class="legend-desc">Smart</div>
+        </div>
+        <div class="legend-item">
+            <div class="legend-code" style="background:#8a078a;color:white;">FER</div>
+            <div class="legend-desc">Ferie</div>
+        </div>
+        <div class="legend-item">
+            <div class="legend-code" style="background:#fff200;">MAL</div>
+            <div class="legend-desc">Malattia</div>
+        </div>
+        <div class="legend-item">
+            <div class="legend-code" style="background:#6f42c1;color:white;">JOE</div>
+            <div class="legend-desc">Jolly</div>
+        </div>
+        <div class="legend-item">
+            <div class="legend-code" style="background:#d9d9d9;">LIB</div>
+            <div class="legend-desc">Festivo</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 def abbrevia_persona(nome):
     nome = str(nome).strip()
     if nome.lower().startswith("margherita"):
@@ -400,11 +480,12 @@ def abbrevia_persona(nome):
 
 
 def render_calendario_mese(df, df_feste, anno, mese):
-    """Calendario del mese corrente con tutte le persone nella stessa cella."""
+    """Calendario del mese corrente con tutte le persone nella stessa cella, una persona per riga."""
     mesi_it = [
         "GENNAIO", "FEBBRAIO", "MARZO", "APRILE", "MAGGIO", "GIUGNO",
         "LUGLIO", "AGOSTO", "SETTEMBRE", "OTTOBRE", "NOVEMBRE", "DICEMBRE"
     ]
+
     giorni = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"]
 
     lookup = {}
@@ -413,70 +494,102 @@ def render_calendario_mese(df, df_feste, anno, mese):
         tmp["data"] = pd.to_datetime(tmp["data"], errors="coerce").dt.date
         tmp = tmp.dropna(subset=["data"])
         tmp["codice"] = tmp["stato"].map(CODICI).fillna(tmp["stato"])
+
         for _, r in tmp.iterrows():
             lookup[(r["data"], r["persona"])] = r["codice"]
+
+    colori = {
+        "UFF": "#ff8a00",
+        "LAW": "#19e635",
+        "FER": "#8a078a",
+        "MAL": "#fff200",
+        "JOE": "#6f42c1",
+        "LIB": "#d9d9d9",
+        "EMPTY": "transparent",
+    }
+
+    testo_colore = {
+        "FER": "#ffffff",
+        "JOE": "#ffffff",
+    }
 
     _, giorni_mese = calendar.monthrange(anno, mese)
 
     settimane = []
-    settimana = ["" for _ in range(7)]
+    settimana = [None for _ in range(7)]
 
     for day in range(1, giorni_mese + 1):
-        data = date(anno, mese, day)
-        weekday = data.weekday()
-        bloccato = is_giorno_bloccato(data, df_feste)
+        data_giorno = date(anno, mese, day)
+        weekday = data_giorno.weekday()
+        bloccato = is_giorno_bloccato(data_giorno, df_feste)
 
         if bloccato:
-            testo = f"{day} LIB"
+            contenuto = f"""
+            <div class="day-number">{day}</div>
+            <span class="pres-row">LIB</span>
+            """
+            colore_bg = colori["LIB"]
+            colore_txt = "#000000"
         else:
-            righe = [str(day)]
-            for persona in PERSONE:
-                codice = lookup.get((data, persona), "")
-                if codice:
-                    righe.append(f"{abbrevia_persona(persona)} {codice}")
-            testo = "\n".join(righe)
+            righe = [f'<div class="day-number">{day}</div>']
+            codici_presenti = []
 
-        settimana[weekday] = testo
+            for persona in PERSONE:
+                codice = lookup.get((data_giorno, persona), "")
+                if codice:
+                    nome_breve = abbrevia_persona(persona)
+                    righe.append(f'<span class="pres-row">{nome_breve} {codice}</span>')
+                    codici_presenti.append(codice)
+
+            contenuto = "".join(righe)
+
+            if len(set(codici_presenti)) == 1 and codici_presenti:
+                codice_bg = codici_presenti[0]
+                colore_bg = colori.get(codice_bg, colori["EMPTY"])
+                colore_txt = testo_colore.get(codice_bg, "#000000")
+            elif len(set(codici_presenti)) > 1:
+                colore_bg = "rgba(255,255,255,0.08)"
+                colore_txt = "#ffffff"
+            else:
+                colore_bg = "transparent"
+                colore_txt = "#ffffff"
+
+        settimana[weekday] = f"""
+        <td style="background:{colore_bg}; color:{colore_txt};">
+            {contenuto}
+        </td>
+        """
 
         if weekday == 6:
             settimane.append(settimana)
-            settimana = ["" for _ in range(7)]
+            settimana = [None for _ in range(7)]
 
-    if any(x != "" for x in settimana):
+    if any(x is not None for x in settimana):
         settimane.append(settimana)
 
-    calendario_df = pd.DataFrame(settimane, columns=giorni)
+    html = f"""
+    <div class="month-title">{mesi_it[mese - 1]} {anno}</div>
+    <table class="calendar-table">
+        <thead>
+            <tr>
+                {''.join([f'<th>{g}</th>' for g in giorni])}
+            </tr>
+        </thead>
+        <tbody>
+    """
 
-    def colore_cella(valore):
-        testo = str(valore)
-        base = "text-align: center; white-space: pre-line; font-weight: 800;"
-        if testo.strip() == "":
-            return base
-        if "LIB" in testo:
-            return f"background-color: #d9d9d9; color: #000000; {base}"
+    for settimana in settimane:
+        html += "<tr>"
+        for cella in settimana:
+            html += cella if cella is not None else "<td></td>"
+        html += "</tr>"
 
-        codici_presenti = [c for c in ["UFF", "LAW", "FER", "MAL", "JOE"] if c in testo]
-        codici_unici = set(codici_presenti)
+    html += """
+        </tbody>
+    </table>
+    """
 
-        if len(codici_unici) == 1:
-            codice = list(codici_unici)[0]
-            colore = COLORI.get(codice, "#111827")
-            colore_testo = "#ffffff" if codice in ["FER", "JOE"] else "#000000"
-            return f"background-color: {colore}; color: {colore_testo}; {base}"
-
-        if len(codici_unici) > 1:
-            return f"background-color: #374151; color: #ffffff; {base}"
-
-        return base
-
-    st.markdown(f"### {mesi_it[mese - 1]} {anno}")
-    st.dataframe(
-        calendario_df.style.map(colore_cella),
-        hide_index=True,
-        width="stretch"
-    )
-
-
+    st.markdown(html, unsafe_allow_html=True)
 def genera_excel_formattato(df, df_feste, riepilogo, anno):
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
