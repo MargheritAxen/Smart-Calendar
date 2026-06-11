@@ -89,6 +89,7 @@ st.markdown("""
     font-size: 1.45rem;
     font-weight: 900;
     margin: 22px 0 10px 0;
+    text-align: center;
 }
 
 .calendar-table {
@@ -572,6 +573,7 @@ def render_calendario_mese(df, df_feste, anno, mese):
             font-weight: 900;
             margin: 0 0 12px 0;
             color: white;
+            text-align: center;
         }}
 
         .calendar-table {{
