@@ -47,7 +47,7 @@ COLORI = {
 st.markdown("""
 <style>
 .block-container {
-    padding-top: 4rem;
+    padding-top: 5.5rem;
     max-width: 820px;
 }
 
@@ -956,7 +956,6 @@ riepilogo, df_valido = calcola_riepilogo(df, df_feste)
 
 
 st.markdown('<div class="smart-title">📅 Smart Calendar</div>', unsafe_allow_html=True)
-render_legenda()
 
 if righe_importate_margherita > 0:
     st.success(f"Import automatico completato: {righe_importate_margherita} presenze storiche di Margherita caricate.")
@@ -1002,8 +1001,55 @@ with tab1:
 
     st.divider()
 
+    # Calendario consultabile mese per mese
     oggi = date.today()
-    render_calendario_mese(df, df_feste, oggi.year, oggi.month)
+
+    if "cal_anno" not in st.session_state:
+        st.session_state.cal_anno = oggi.year
+
+    if "cal_mese" not in st.session_state:
+        st.session_state.cal_mese = oggi.month
+
+    def cambia_mese(delta):
+        nuovo_mese = st.session_state.cal_mese + delta
+        nuovo_anno = st.session_state.cal_anno
+
+        if nuovo_mese < 1:
+            nuovo_mese = 12
+            nuovo_anno -= 1
+
+        if nuovo_mese > 12:
+            nuovo_mese = 1
+            nuovo_anno += 1
+
+        st.session_state.cal_mese = nuovo_mese
+        st.session_state.cal_anno = nuovo_anno
+
+    col_prev, col_today, col_next = st.columns([1, 1, 1])
+
+    with col_prev:
+        if st.button("◀ Mese precedente", width="stretch"):
+            cambia_mese(-1)
+            st.rerun()
+
+    with col_today:
+        if st.button("Oggi", width="stretch"):
+            st.session_state.cal_anno = oggi.year
+            st.session_state.cal_mese = oggi.month
+            st.rerun()
+
+    with col_next:
+        if st.button("Mese successivo ▶", width="stretch"):
+            cambia_mese(1)
+            st.rerun()
+
+    render_legenda()
+    render_calendario_mese(
+        df,
+        df_feste,
+        int(st.session_state.cal_anno),
+        int(st.session_state.cal_mese)
+    )
 
 
 with tab2:
