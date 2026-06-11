@@ -679,61 +679,33 @@ def genera_excel_formattato(df, df_feste, riepilogo, anno):
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
     from openpyxl.utils import get_column_letter
-    from openpyxl.worksheet.datavalidation import DataValidation
 
     buffer = BytesIO()
     wb = Workbook()
+
     ws = wb.active
     ws.title = str(anno)
     ws_riep = wb.create_sheet("Riepilogo")
 
-    persone = PERSONE
     mesi = [
         "GENNAIO", "FEBBRAIO", "MARZO", "APRILE", "MAGGIO", "GIUGNO",
         "LUGLIO", "AGOSTO", "SETTEMBRE", "OTTOBRE", "NOVEMBRE", "DICEMBRE"
     ]
-    giorni_it = ["Lu", "Ma", "Me", "Gi", "Ve", "Sa", "Do"]
 
-    feste_extra = feste_extra_aziendali(anno)
-    feste_manuali = date_festive_manuali(df_feste)
+    giorni = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"]
 
-    fill_header = PatternFill("solid", fgColor="D9EAF7")
+    fill_header = PatternFill("solid", fgColor="E8EEF7")
     fill_month = PatternFill("solid", fgColor="1F4E78")
+    fill_empty = PatternFill("solid", fgColor="FFFFFF")
     fill_uff = PatternFill("solid", fgColor="F9CB9C")
     fill_law = PatternFill("solid", fgColor="B6D7A8")
     fill_fer = PatternFill("solid", fgColor="D5A6BD")
     fill_mal = PatternFill("solid", fgColor="FFF2CC")
     fill_jol = PatternFill("solid", fgColor="D9D2E9")
+    fill_mixed = PatternFill("solid", fgColor="E7E6E6")
 
     thin = Side(style="thin", color="B7B7B7")
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
-
-    presenze = df.copy()
-    if not presenze.empty:
-        presenze["data"] = pd.to_datetime(presenze["data"]).dt.date
-        presenze["codice"] = presenze["giustificativo"].map(CODICI).fillna(presenze["giustificativo"])
-        lookup = {(r["data"], r["persona"]): r["codice"] for _, r in presenze.iterrows()}
-    else:
-        lookup = {}
-
-    ws["A1"] = "LEGENDA"
-    ws["A1"].font = Font(bold=True)
-    legenda = [
-        ("UFF", "Presenza"),
-        ("LAW", "Smart working"),
-        ("FER", "Ferie - non conta"),
-        ("MAL", "Malattia - non conta"),
-        ("JOL", "Jolly - non conta"),
-    ]
-    for i, (codice, descrizione) in enumerate(legenda, start=2):
-        ws[f"A{i}"] = codice
-        ws[f"B{i}"] = descrizione
-        ws[f"A{i}"].font = Font(bold=True)
-        ws[f"A{i}"].border = border
-        ws[f"B{i}"].border = border
-
-    start_cols = [1, 6, 11]
-    start_rows = [10, 47, 84, 121]
 
     codice_fill = {
         "UFF": fill_uff,
@@ -743,74 +715,161 @@ def genera_excel_formattato(df, df_feste, riepilogo, anno):
         "JOL": fill_jol,
     }
 
+    presenze = df.copy()
+
+    if not presenze.empty:
+        presenze["data"] = pd.to_datetime(presenze["data"], errors="coerce").dt.date
+        presenze = presenze.dropna(subset=["data"])
+        presenze["codice"] = presenze["giustificativo"].map(CODICI).fillna(presenze["giustificativo"])
+        lookup = {
+            (r["data"], r["persona"]): r["codice"]
+            for _, r in presenze.iterrows()
+        }
+    else:
+        lookup = {}
+
+    # Impostazione larghezza colonne: calendario leggibile da iPhone, solo scroll verticale
+    for col in range(1, 8):
+        ws.column_dimensions[get_column_letter(col)].width = 15
+
+    ws.sheet_view.showGridLines = False
+
+    # Legenda compatta
+    ws.merge_cells("A1:G1")
+    ws["A1"] = "SMART CALENDAR - LEGENDA"
+    ws["A1"].font = Font(bold=True, size=14, color="FFFFFF")
+    ws["A1"].fill = fill_month
+    ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 24
+
+    legenda = [
+        ("UFF", "Presenza / ufficio", fill_uff),
+        ("LAW", "Smart working", fill_law),
+        ("FER", "Ferie - non conta", fill_fer),
+        ("MAL", "Malattia - non conta", fill_mal),
+        ("JOL", "Jolly - non conta", fill_jol),
+    ]
+
+    for idx, (codice, descrizione, fill) in enumerate(legenda, start=1):
+        cell_code = ws.cell(2, idx, codice)
+        cell_code.font = Font(bold=True)
+        cell_code.fill = fill
+        cell_code.border = border
+        cell_code.alignment = Alignment(horizontal="center", vertical="center")
+
+        cell_desc = ws.cell(3, idx, descrizione)
+        cell_desc.font = Font(size=9)
+        cell_desc.border = border
+        cell_desc.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    ws.row_dimensions[2].height = 22
+    ws.row_dimensions[3].height = 34
+
+    current_row = 5
+
     for month in range(1, 13):
-        block_col = start_cols[(month - 1) % 3]
-        block_row = start_rows[(month - 1) // 3]
+        # Titolo mese
+        ws.merge_cells(
+            start_row=current_row,
+            start_column=1,
+            end_row=current_row,
+            end_column=7
+        )
 
-        ws.merge_cells(start_row=block_row, start_column=block_col, end_row=block_row, end_column=block_col + 3)
-        c = ws.cell(block_row, block_col, mesi[month - 1])
-        c.font = Font(bold=True, color="FFFFFF")
-        c.fill = fill_month
-        c.alignment = Alignment(horizontal="center")
+        title_cell = ws.cell(current_row, 1, f"{mesi[month - 1]} {anno}")
+        title_cell.font = Font(bold=True, size=18, color="FFFFFF")
+        title_cell.fill = fill_month
+        title_cell.alignment = Alignment(horizontal="center", vertical="center")
+        ws.row_dimensions[current_row].height = 28
 
-        headers = ["Giorno", "Sett."] + persone
-        for j, h in enumerate(headers):
-            cell = ws.cell(block_row + 1, block_col + j, h)
-            cell.font = Font(bold=True)
+        current_row += 1
+
+        # Header giorni
+        for col_idx, g in enumerate(giorni, start=1):
+            cell = ws.cell(current_row, col_idx, g)
+            cell.font = Font(bold=True, size=11)
             cell.fill = fill_header
             cell.border = border
-            cell.alignment = Alignment(horizontal="center")
+            cell.alignment = Alignment(horizontal="center", vertical="center")
 
-        days = calendar.monthrange(anno, month)[1]
-        for day in range(1, days + 1):
-            row = block_row + 1 + day
+        ws.row_dimensions[current_row].height = 24
+        current_row += 1
+
+        _, giorni_mese = calendar.monthrange(anno, month)
+
+        settimane = []
+        settimana = [None for _ in range(7)]
+
+        for day in range(1, giorni_mese + 1):
             data = date(anno, month, day)
             weekday = data.weekday()
-            is_festivo = data in festivita_italiane or data in feste_extra or data in feste_manuali
+            settimana[weekday] = data
 
-            values = [day, giorni_it[weekday]]
-            for persona in persone:
-                values.append("" if weekday >= 5 or is_festivo else lookup.get((data, persona), ""))
+            if weekday == 6:
+                settimane.append(settimana)
+                settimana = [None for _ in range(7)]
 
-            for j, value in enumerate(values):
-                cell = ws.cell(row, block_col + j, value)
+        if any(x is not None for x in settimana):
+            settimane.append(settimana)
+
+        for settimana in settimane:
+            for col_idx, data_giorno in enumerate(settimana, start=1):
+                cell = ws.cell(current_row, col_idx)
+
+                if data_giorno is None:
+                    cell.value = ""
+                    cell.fill = fill_empty
+                else:
+                    bloccato = is_giorno_bloccato(data_giorno, df_feste)
+
+                    righe = [str(data_giorno.day)]
+                    codici_presenti = []
+
+                    if not bloccato:
+                        for persona in PERSONE:
+                            codice = lookup.get((data_giorno, persona), "")
+                            if codice:
+                                righe.append(f"{abbrevia_persona(persona)} {codice}")
+                                codici_presenti.append(codice)
+
+                    cell.value = "".join(righe)
+
+                    if len(set(codici_presenti)) == 1 and codici_presenti:
+                        cell.fill = codice_fill.get(codici_presenti[0], fill_empty)
+                    elif len(set(codici_presenti)) > 1:
+                        cell.fill = fill_mixed
+                    else:
+                        cell.fill = fill_empty
+
                 cell.border = border
-                cell.alignment = Alignment(horizontal="center")
-                if value in codice_fill:
-                    cell.fill = codice_fill[value]
-                    cell.font = Font(bold=True, color="000000")
+                cell.alignment = Alignment(
+                    horizontal="center",
+                    vertical="center",
+                    wrap_text=True
+                )
+                cell.font = Font(bold=True, size=11)
 
-    dv = DataValidation(type="list", formula1='"UFF,LAW,FER,MAL,JOL"', allow_blank=True)
-    ws.add_data_validation(dv)
+            ws.row_dimensions[current_row].height = 72
+            current_row += 1
 
-    for month in range(1, 13):
-        block_col = start_cols[(month - 1) % 3]
-        block_row = start_rows[(month - 1) // 3]
-        days = calendar.monthrange(anno, month)[1]
+        current_row += 2
 
-        for day in range(1, days + 1):
-            data = date(anno, month, day)
-            if is_giorno_bloccato(data, df_feste):
-                continue
-
-            excel_row = block_row + 1 + day
-            for p_idx in range(len(persone)):
-                cell_ref = f"{get_column_letter(block_col + 2 + p_idx)}{excel_row}"
-                dv.add(cell_ref)
-
-    for col in range(1, 16):
-        ws.column_dimensions[get_column_letter(col)].width = 13
-
+    # Riepilogo
+    ws_riep.sheet_view.showGridLines = False
     ws_riep["A1"] = "RIEPILOGO PRESENZE"
     ws_riep["A1"].font = Font(bold=True, size=14)
 
-    headers = ["persona", "trimestre", "UFF", "LAW", "FER", "MAL", "JOL", "Giorni conteggiati", "% UFF", "% LAW", "Esito"]
+    headers = [
+        "persona", "trimestre", "UFF", "LAW", "FER", "MAL", "JOL",
+        "Giorni conteggiati", "% UFF", "% LAW", "Esito"
+    ]
+
     for j, h in enumerate(headers, start=1):
         cell = ws_riep.cell(3, j, h)
         cell.font = Font(bold=True)
         cell.fill = fill_header
         cell.border = border
-        cell.alignment = Alignment(horizontal="center")
+        cell.alignment = Alignment(horizontal="center", vertical="center")
 
     if not riepilogo.empty:
         for i, (_, r) in enumerate(riepilogo.iterrows(), start=4):
@@ -818,7 +877,7 @@ def genera_excel_formattato(df, df_feste, riepilogo, anno):
                 value = r[h] if h in r.index else ""
                 cell = ws_riep.cell(i, j, value)
                 cell.border = border
-                cell.alignment = Alignment(horizontal="center")
+                cell.alignment = Alignment(horizontal="center", vertical="center")
 
     for col in range(1, 12):
         ws_riep.column_dimensions[get_column_letter(col)].width = 16
