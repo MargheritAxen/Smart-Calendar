@@ -15,7 +15,7 @@ st.set_page_config(
 )
 
 # ===== CONFIG =====
-STATI = ["Ufficio", "Smart", "Ferie", "Malattia", "Joe"]
+STATI = ["Ufficio", "Smart", "Ferie", "Malattia", "Jol"]
 PERSONE = ["Margherita", "Roberto"]
 
 NOME_FILE_GOOGLE_SHEETS = "Smart Calendar"
@@ -31,7 +31,7 @@ CODICI = {
     "Smart": "LAW",
     "Ferie": "FER",
     "Malattia": "MAL",
-    "Joe": "JOE",
+    "Jol": "JOL",
     "Assenza": "FER",
 }
 
@@ -40,7 +40,7 @@ COLORI = {
     "LAW": "#19e635",
     "FER": "#8a078a",
     "MAL": "#fff200",
-    "JOE": "#6f42c1",
+    "JOL": "#6f42c1",
     "LIB": "#d9d9d9",
 }
 
@@ -61,29 +61,29 @@ st.markdown("""
 .legend-compact {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
-    gap: 6px;
-    margin: 8px 0 20px 0;
+    gap: 4px;
+    margin: 6px 0 8px 0;
 }
 
 .legend-item {
-    border-radius: 10px;
+    border-radius: 8px;
     overflow: hidden;
     border: 1px solid rgba(255,255,255,0.18);
     text-align: center;
-    font-size: 0.72rem;
+    font-size: 0.62rem;
 }
 
 .legend-code {
     font-weight: 900;
-    padding: 5px 3px;
+    padding: 4px 2px;
     color: #000;
 }
 
 .legend-desc {
-    padding: 5px 3px;
+    padding: 4px 2px;
     background: rgba(255,255,255,0.05);
-    font-size: 0.68rem;
-    min-height: 28px;
+    font-size: 0.58rem;
+    min-height: 20px;
 }
 
 .month-title {
@@ -122,7 +122,7 @@ st.markdown("""
 
 .pres-row {
     display: block;
-    font-size: 0.72rem;
+    font-size: 0.62rem;
     line-height: 1.1rem;
     white-space: nowrap;
 }
@@ -204,7 +204,7 @@ def inizializza_fogli():
     ws_riepilogo = crea_o_prendi(
         FOGLIO_RIEPILOGO,
         [
-            "persona", "trimestre", "UFF", "LAW", "FER", "MAL", "JOE",
+            "persona", "trimestre", "UFF", "LAW", "FER", "MAL", "JOL",
             "Giorni conteggiati", "% UFF", "% LAW", "Esito"
         ]
     )
@@ -336,7 +336,7 @@ def salva_feste_manuali(df):
 
 def salva_riepilogo(riepilogo):
     intestazioni = [
-        "persona", "trimestre", "UFF", "LAW", "FER", "MAL", "JOE",
+        "persona", "trimestre", "UFF", "LAW", "FER", "MAL", "JOL",
         "Giorni conteggiati", "% UFF", "% LAW", "Esito"
     ]
 
@@ -415,7 +415,7 @@ def calcola_riepilogo(df, df_feste):
         .reset_index()
     )
 
-    for col in ["UFF", "LAW", "FER", "MAL", "JOE"]:
+    for col in ["UFF", "LAW", "FER", "MAL", "JOL"]:
         if col not in riepilogo.columns:
             riepilogo[col] = 0
 
@@ -435,7 +435,7 @@ def calcola_riepilogo(df, df_feste):
     )
 
     ordine_colonne = [
-        "persona", "trimestre", "UFF", "LAW", "FER", "MAL", "JOE",
+        "persona", "trimestre", "UFF", "LAW", "FER", "MAL", "JOL",
         "Giorni conteggiati", "% UFF", "% LAW", "Esito"
     ]
 
@@ -462,7 +462,7 @@ def render_legenda():
             <div class="legend-desc">Malattia</div>
         </div>
         <div class="legend-item">
-            <div class="legend-code" style="background:#6f42c1;color:white;">JOE</div>
+            <div class="legend-code" style="background:#6f42c1;color:white;">JOL</div>
             <div class="legend-desc">Jolly</div>
         </div>
         <div class="legend-item">
@@ -504,7 +504,7 @@ def render_calendario_mese(df, df_feste, anno, mese):
         'LAW': '#19e635',
         'FER': '#8a078a',
         'MAL': '#fff200',
-        'JOE': '#6f42c1',
+        'JOL': '#6f42c1',
         'LIB': '#d9d9d9',
         'EMPTY': '#111827',
     }
@@ -514,7 +514,7 @@ def render_calendario_mese(df, df_feste, anno, mese):
         'LAW': '#000000',
         'FER': '#ffffff',
         'MAL': '#000000',
-        'JOE': '#ffffff',
+        'JOL': '#ffffff',
     }
 
     _, giorni_mese = calendar.monthrange(anno, mese)
@@ -581,7 +581,7 @@ def render_calendario_mese(df, df_feste, anno, mese):
             border-collapse: collapse;
             table-layout: fixed;
             overflow: hidden;
-            border-radius: 10px;
+            border-radius: 8px;
         }}
 
         .calendar-table th {{
@@ -703,7 +703,7 @@ def genera_excel_formattato(df, df_feste, riepilogo, anno):
     fill_law = PatternFill("solid", fgColor="B6D7A8")
     fill_fer = PatternFill("solid", fgColor="D5A6BD")
     fill_mal = PatternFill("solid", fgColor="FFF2CC")
-    fill_joe = PatternFill("solid", fgColor="D9D2E9")
+    fill_jol = PatternFill("solid", fgColor="D9D2E9")
     fill_lib = PatternFill("solid", fgColor="D9D9D9")
 
     thin = Side(style="thin", color="B7B7B7")
@@ -724,7 +724,7 @@ def genera_excel_formattato(df, df_feste, riepilogo, anno):
         ("LAW", "Smart working"),
         ("FER", "Ferie - non conta"),
         ("MAL", "Malattia - non conta"),
-        ("JOE", "Jolly - non conta"),
+        ("JOL", "Jolly - non conta"),
         ("LIB", "Giorno libero/festivo - non conta"),
     ]
     for i, (codice, descrizione) in enumerate(legenda, start=2):
@@ -742,7 +742,7 @@ def genera_excel_formattato(df, df_feste, riepilogo, anno):
         "LAW": fill_law,
         "FER": fill_fer,
         "MAL": fill_mal,
-        "JOE": fill_joe,
+        "JOL": fill_jol,
         "LIB": fill_lib,
     }
 
@@ -783,7 +783,7 @@ def genera_excel_formattato(df, df_feste, riepilogo, anno):
                     cell.fill = codice_fill[value]
                     cell.font = Font(bold=True, color="000000")
 
-    dv = DataValidation(type="list", formula1='"UFF,LAW,FER,MAL,JOE"', allow_blank=True)
+    dv = DataValidation(type="list", formula1='"UFF,LAW,FER,MAL,JOL"', allow_blank=True)
     ws.add_data_validation(dv)
 
     for month in range(1, 13):
@@ -807,7 +807,7 @@ def genera_excel_formattato(df, df_feste, riepilogo, anno):
     ws_riep["A1"] = "RIEPILOGO PRESENZE"
     ws_riep["A1"].font = Font(bold=True, size=14)
 
-    headers = ["persona", "trimestre", "UFF", "LAW", "FER", "MAL", "JOE", "Giorni conteggiati", "% UFF", "% LAW", "Esito"]
+    headers = ["persona", "trimestre", "UFF", "LAW", "FER", "MAL", "JOL", "Giorni conteggiati", "% UFF", "% LAW", "Esito"]
     for j, h in enumerate(headers, start=1):
         cell = ws_riep.cell(3, j, h)
         cell.font = Font(bold=True)
@@ -864,7 +864,7 @@ def genera_pdf_presenze(df, df_feste, anno):
         "LAW": colors.HexColor("#B6D7A8"),
         "FER": colors.HexColor("#D5A6BD"),
         "MAL": colors.HexColor("#FFF2CC"),
-        "JOE": colors.HexColor("#D9D2E9"),
+        "JOL": colors.HexColor("#D9D2E9"),
         "LIB": colors.HexColor("#D9D9D9"),
         "HEADER": colors.HexColor("#EEEEEE"),
     }
@@ -883,7 +883,7 @@ def genera_pdf_presenze(df, df_feste, anno):
 
         legenda_pdf = "   ".join([
             "UFF = Presenza", "LAW = Smart", "FER = Ferie",
-            "MAL = Malattia", "JOE = Jolly", "LIB = Libero/Festivo"
+            "MAL = Malattia", "JOL = Jolly", "LIB = Libero/Festivo"
         ])
         elementi.append(Paragraph(legenda_pdf, small_style))
         elementi.append(Spacer(1, 8))
@@ -1025,10 +1025,12 @@ with tab1:
         st.session_state.cal_mese = nuovo_mese
         st.session_state.cal_anno = nuovo_anno
 
+    render_legenda()
+
     col_prev, col_today, col_next = st.columns([1, 1, 1])
 
     with col_prev:
-        if st.button("◀ Mese precedente", width="stretch"):
+        if st.button("◀", width="stretch"):
             cambia_mese(-1)
             st.rerun()
 
@@ -1039,11 +1041,10 @@ with tab1:
             st.rerun()
 
     with col_next:
-        if st.button("Mese successivo ▶", width="stretch"):
+        if st.button("▶", width="stretch"):
             cambia_mese(1)
             st.rerun()
 
-    render_legenda()
     render_calendario_mese(
         df,
         df_feste,
