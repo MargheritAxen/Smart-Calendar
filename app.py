@@ -330,79 +330,126 @@ def genera_excel_formattato(df, df_feste, riepilogo, anno):
     return buffer.getvalue()
 
 
-def genera_pdf_riepilogo(df, anno):
+def genera_pdf_presenze(df, anno):
+    """Genera un PDF calendario presenze, leggibile da iPhone, con un mese per pagina."""
     from io import BytesIO
+    from datetime import date
+    import calendar
     from reportlab.lib.pagesizes import A4
     from reportlab.lib import colors
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
     from reportlab.lib.styles import getSampleStyleSheet
 
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=18,
+        leftMargin=18,
+        topMargin=18,
+        bottomMargin=18,
+    )
+
     styles = getSampleStyleSheet()
     elementi = []
 
-    elementi.append(Paragraph(f"Riepilogo Smart Calendar - {anno}", styles["Title"]))
-    elementi.append(Spacer(1, 12))
+    codici = {
+        "Ufficio": "PRE",
+        "Smart": "LAW",
+        "Assenza": "ASS"
+    }
 
-    if df.empty:
-        elementi.append(Paragraph("Nessuna presenza disponibile per l'anno selezionato.", styles["Normal"]))
-    else:
-        codici = {
-            "Ufficio": "PRE",
-            "Smart": "LAW",
-            "Assenza": "ASS"
+    mesi = [
+        "GENNAIO", "FEBBRAIO", "MARZO", "APRILE", "MAGGIO", "GIUGNO",
+        "LUGLIO", "AGOSTO", "SETTEMBRE", "OTTOBRE", "NOVEMBRE", "DICEMBRE"
+    ]
+    giorni_it = ["Lu", "Ma", "Me", "Gi", "Ve", "Sa", "Do"]
+
+    colore_header = colors.HexColor("#D9EAF7")
+    colore_mese = colors.HexColor("#1F4E78")
+    colore_weekend_festivi = colors.HexColor("#E7E6E6")
+    colore_ass = colors.HexColor("#F4CCCC")
+    colore_pre = colors.HexColor("#D9EAD3")
+    colore_law = colors.HexColor("#CFE2F3")
+
+    persone = PERSONE
+
+    presenze = df.copy()
+    if not presenze.empty:
+        presenze["data"] = pd.to_datetime(presenze["data"]).dt.date
+        presenze["codice"] = presenze["stato"].map(codici).fillna(presenze["stato"])
+        lookup = {
+            (r["data"], r["persona"]): r["codice"]
+            for _, r in presenze.iterrows()
         }
+    else:
+        lookup = {}
 
-        df_pdf = df.copy()
-        df_pdf["data"] = pd.to_datetime(df_pdf["data"], errors="coerce")
-        df_pdf = df_pdf.dropna(subset=["data"])
-        df_pdf["codice"] = df_pdf["stato"].map(codici).fillna(df_pdf["stato"])
+    feste_extra = feste_extra_aziendali(anno)
 
-        pivot = (
-            df_pdf
-            .groupby(["persona", "codice"])
-            .size()
-            .unstack(fill_value=0)
-            .reset_index()
-        )
+    for month in range(1, 13):
+        elementi.append(Paragraph(f"{mesi[month - 1]} {anno}", styles["Title"]))
+        elementi.append(Spacer(1, 8))
 
-        for col in ["PRE", "LAW", "ASS"]:
-            if col not in pivot.columns:
-                pivot[col] = 0
+        dati_tabella = [["Giorno", "Sett."] + persone]
+        row_status = []
 
-        pivot["Totale"] = pivot[["PRE", "LAW", "ASS"]].sum(axis=1)
-        for col in ["PRE", "LAW", "ASS"]:
-            pivot[f"% {col}"] = (pivot[col] / pivot["Totale"] * 100).fillna(0).round(2)
+        days = calendar.monthrange(anno, month)[1]
+        for day in range(1, days + 1):
+            data = date(anno, month, day)
+            weekday = data.weekday()
+            is_festivo = (
+                data in festivita_italiane
+                or data in feste_extra
+            )
 
-        dati = [["Persona", "PRE", "LAW", "ASS", "Totale", "% PRE", "% LAW", "% ASS"]]
+            riga = [str(day), giorni_it[weekday]]
+            for persona in persone:
+                riga.append(lookup.get((data, persona), ""))
 
-        for _, r in pivot.iterrows():
-            dati.append([
-                r["persona"],
-                int(r["PRE"]),
-                int(r["LAW"]),
-                int(r["ASS"]),
-                int(r["Totale"]),
-                f'{r["% PRE"]}%',
-                f'{r["% LAW"]}%',
-                f'{r["% ASS"]}%'
-            ])
+            dati_tabella.append(riga)
+            row_status.append({
+                "weekend_o_festivo": weekday >= 5 or is_festivo,
+                "valori": riga,
+            })
 
-        tabella = Table(dati, repeatRows=1)
-        tabella.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-            ("ALIGN", (1, 1), (-1, -1), "CENTER"),
+        col_widths = [42, 42] + [78 for _ in persone]
+        tabella = Table(dati_tabella, repeatRows=1, colWidths=col_widths)
+
+        stile = TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colore_header),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
-        ]))
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ])
 
+        for idx, info in enumerate(row_status, start=1):
+            if info["weekend_o_festivo"]:
+                stile.add("BACKGROUND", (0, idx), (-1, idx), colore_weekend_festivi)
+                stile.add("FONTNAME", (0, idx), (-1, idx), "Helvetica-Bold")
+                stile.add("TEXTCOLOR", (0, idx), (-1, idx), colors.HexColor("#666666"))
+            else:
+                for col_idx, valore in enumerate(info["valori"]):
+                    if valore == "ASS":
+                        stile.add("BACKGROUND", (col_idx, idx), (col_idx, idx), colore_ass)
+                    elif valore == "PRE":
+                        stile.add("BACKGROUND", (col_idx, idx), (col_idx, idx), colore_pre)
+                    elif valore == "LAW":
+                        stile.add("BACKGROUND", (col_idx, idx), (col_idx, idx), colore_law)
+
+        tabella.setStyle(stile)
         elementi.append(tabella)
+
+        if month < 12:
+            elementi.append(PageBreak())
 
     doc.build(elementi)
     return buffer.getvalue()
-
 
 
 
@@ -789,7 +836,7 @@ with tab3:
         anno=int(anno_selezionato)
     )
 
-    pdf_riepilogo = genera_pdf_riepilogo(
+    pdf_presenze = genera_pdf_presenze(
         df_anno,
         anno=int(anno_selezionato)
     )
@@ -811,9 +858,9 @@ with tab3:
     )
 
     st.download_button(
-        "Scarica PDF riepilogo",
-        data=pdf_riepilogo,
-        file_name=f"smart_calendar_{anno_selezionato}_riepilogo.pdf",
+        "Scarica PDF presenze",
+        data=pdf_presenze,
+        file_name=f"smart_calendar_{anno_selezionato}_presenze.pdf",
         mime="application/pdf",
         use_container_width=True
     )
