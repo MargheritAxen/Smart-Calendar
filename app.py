@@ -832,7 +832,7 @@ def genera_excel_formattato(df, df_feste, riepilogo, anno):
                                 righe.append(f"{abbrevia_persona(persona)} {codice}")
                                 codici_presenti.append(codice)
 
-                    cell.value = "".join(righe)
+                    cell.value = "\n".join(righe)
 
                     if len(set(codici_presenti)) == 1 and codici_presenti:
                         cell.fill = codice_fill.get(codici_presenti[0], fill_empty)
