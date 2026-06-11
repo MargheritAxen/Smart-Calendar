@@ -3,7 +3,7 @@ import pandas as pd
 import holidays
 import gspread
 from google.oauth2.service_account import Credentials
-from datetime import date
+from datetime import date, timedelta
 from io import BytesIO
 
 st.set_page_config(
@@ -112,6 +112,35 @@ def inizializza_fogli():
 
 spreadsheet, ws_presenze, ws_feste, ws_riepilogo = inizializza_fogli()
 
+# ===== FESTIVITÀ EXTRA AZIENDALI BLOCCATE =====
+def feste_extra_aziendali(anno):
+    """Festività aggiuntive da trattare come weekend: grigie e non selezionabili."""
+    from dateutil.easter import easter
+
+    pasqua = easter(anno)
+
+    return {
+        date(anno, 3, 19),              # San Giuseppe
+        pasqua + timedelta(days=39),    # Ascensione
+        pasqua + timedelta(days=60),    # Corpus Domini
+        date(anno, 11, 4),              # Festa dell'Unità Nazionale
+        date(anno, 12, 8),              # Milano / Immacolata
+        date(anno, 11, 2),              # Commemorazione dei Defunti
+        date(anno, 12, 24),             # Vigilia di Natale
+        date(anno, 12, 31),             # San Silvestro
+    }
+
+
+def date_festive_manuali(df_feste):
+    if df_feste.empty:
+        return set()
+
+    tmp = df_feste.copy()
+    tmp["data"] = pd.to_datetime(tmp["data"], errors="coerce")
+    tmp = tmp.dropna(subset=["data"])
+    return set(tmp["data"].dt.date)
+
+
 # ===== EXPORT EXCEL FORMATTATO =====
 def genera_excel_formattato(df, df_feste, riepilogo, anno):
     from io import BytesIO
@@ -139,6 +168,8 @@ def genera_excel_formattato(df, df_feste, riepilogo, anno):
         "LUGLIO", "AGOSTO", "SETTEMBRE", "OTTOBRE", "NOVEMBRE", "DICEMBRE"
     ]
     giorni_it = ["Lu", "Ma", "Me", "Gi", "Ve", "Sa", "Do"]
+    feste_extra = feste_extra_aziendali(anno)
+    feste_manuali = date_festive_manuali(df_feste)
 
     fill_header = PatternFill("solid", fgColor="D9EAF7")
     fill_month = PatternFill("solid", fgColor="1F4E78")
@@ -200,7 +231,11 @@ def genera_excel_formattato(df, df_feste, riepilogo, anno):
             row = block_row + 1 + day
             data = pd.Timestamp(year=anno, month=month, day=day).date()
             weekday = data.weekday()
-            is_festivo = data in festivita_italiane
+            is_festivo = (
+                data in festivita_italiane
+                or data in feste_extra
+                or data in feste_manuali
+            )
             values = [day, giorni_it[weekday]]
             for persona in persone:
                 values.append(lookup.get((data, persona), ""))
@@ -219,13 +254,32 @@ def genera_excel_formattato(df, df_feste, riepilogo, anno):
                 elif value == "LAW":
                     cell.fill = fill_law
 
-    # Validazione celle editabili nel calendario esportato
+    # Validazione solo sulle celle realmente compilabili.
+    # Weekend, festività italiane, festività extra aziendali e festività manuali restano bloccate visivamente.
     dv = DataValidation(type="list", formula1='"ASS,PRE,LAW"', allow_blank=True)
     ws.add_data_validation(dv)
-    for row in start_rows:
-        for col in start_cols:
+
+    for month in range(1, 13):
+        block_col = start_cols[(month - 1) % 3]
+        block_row = start_rows[(month - 1) // 3]
+        days = calendar.monthrange(anno, month)[1]
+
+        for day in range(1, days + 1):
+            data = pd.Timestamp(year=anno, month=month, day=day).date()
+            weekday = data.weekday()
+            is_festivo = (
+                data in festivita_italiane
+                or data in feste_extra
+                or data in feste_manuali
+            )
+
+            if weekday >= 5 or is_festivo:
+                continue
+
+            excel_row = block_row + 1 + day
             for p_idx in range(len(persone)):
-                dv.add(f"{get_column_letter(col + 2 + p_idx)}{row + 2}:{get_column_letter(col + 2 + p_idx)}{row + 32}")
+                cell_ref = f"{get_column_letter(block_col + 2 + p_idx)}{excel_row}"
+                dv.add(cell_ref)
 
     for col in range(1, 16):
         ws.column_dimensions[get_column_letter(col)].width = 13
@@ -274,6 +328,81 @@ def genera_excel_formattato(df, df_feste, riepilogo, anno):
 
     wb.save(buffer)
     return buffer.getvalue()
+
+
+def genera_pdf_riepilogo(df, anno):
+    from io import BytesIO
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    styles = getSampleStyleSheet()
+    elementi = []
+
+    elementi.append(Paragraph(f"Riepilogo Smart Calendar - {anno}", styles["Title"]))
+    elementi.append(Spacer(1, 12))
+
+    if df.empty:
+        elementi.append(Paragraph("Nessuna presenza disponibile per l'anno selezionato.", styles["Normal"]))
+    else:
+        codici = {
+            "Ufficio": "PRE",
+            "Smart": "LAW",
+            "Assenza": "ASS"
+        }
+
+        df_pdf = df.copy()
+        df_pdf["data"] = pd.to_datetime(df_pdf["data"], errors="coerce")
+        df_pdf = df_pdf.dropna(subset=["data"])
+        df_pdf["codice"] = df_pdf["stato"].map(codici).fillna(df_pdf["stato"])
+
+        pivot = (
+            df_pdf
+            .groupby(["persona", "codice"])
+            .size()
+            .unstack(fill_value=0)
+            .reset_index()
+        )
+
+        for col in ["PRE", "LAW", "ASS"]:
+            if col not in pivot.columns:
+                pivot[col] = 0
+
+        pivot["Totale"] = pivot[["PRE", "LAW", "ASS"]].sum(axis=1)
+        for col in ["PRE", "LAW", "ASS"]:
+            pivot[f"% {col}"] = (pivot[col] / pivot["Totale"] * 100).fillna(0).round(2)
+
+        dati = [["Persona", "PRE", "LAW", "ASS", "Totale", "% PRE", "% LAW", "% ASS"]]
+
+        for _, r in pivot.iterrows():
+            dati.append([
+                r["persona"],
+                int(r["PRE"]),
+                int(r["LAW"]),
+                int(r["ASS"]),
+                int(r["Totale"]),
+                f'{r["% PRE"]}%',
+                f'{r["% LAW"]}%',
+                f'{r["% ASS"]}%'
+            ])
+
+        tabella = Table(dati, repeatRows=1)
+        tabella.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+            ("ALIGN", (1, 1), (-1, -1), "CENTER"),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
+        ]))
+
+        elementi.append(tabella)
+
+    doc.build(elementi)
+    return buffer.getvalue()
+
 
 
 
@@ -409,6 +538,10 @@ def calcola_riepilogo(df, df_feste):
         df_feste = df_feste.dropna(subset=["data"])
         date_feste_manuali = set(df_feste["data"].dt.date)
 
+    date_feste_extra = set()
+    for anno in df["data"].dt.year.dropna().unique():
+        date_feste_extra.update(feste_extra_aziendali(int(anno)))
+
     df["weekend"] = df["data"].dt.weekday >= 5
 
     df["festivo_italia"] = df["data"].dt.date.apply(
@@ -419,10 +552,15 @@ def calcola_riepilogo(df, df_feste):
         lambda x: x in date_feste_manuali
     )
 
+    df["festivo_extra"] = df["data"].dt.date.apply(
+        lambda x: x in date_feste_extra
+    )
+
     df_valido = df[
         (~df["weekend"]) &
         (~df["festivo_italia"]) &
-        (~df["festivo_manuale"])
+        (~df["festivo_manuale"]) &
+        (~df["festivo_extra"])
     ].copy()
 
     lavorati = df_valido[
@@ -459,7 +597,7 @@ def calcola_riepilogo(df, df_feste):
     ).round(2)
 
     riepilogo["Esito"] = riepilogo.apply(
-        lambda r: "OK" if 40 <= r["% Ufficio"] <= 60 else "SFORO",
+        lambda r: "OK" if 40 <= r["% Ufficio"] <= 60 else "KO",
         axis=1
     )
 
@@ -642,6 +780,8 @@ with tab3:
     # filtro dati dell'anno selezionato
     df_anno = df[df["data"].dt.year == anno_selezionato].copy()
 
+    csv_export = df_anno.to_csv(index=False).encode("utf-8")
+
     excel_formattato = genera_excel_formattato(
         df_anno,
         df_feste,
@@ -649,10 +789,31 @@ with tab3:
         anno=int(anno_selezionato)
     )
 
+    pdf_riepilogo = genera_pdf_riepilogo(
+        df_anno,
+        anno=int(anno_selezionato)
+    )
+
+    st.download_button(
+        "Scarica CSV",
+        data=csv_export,
+        file_name=f"smart_calendar_{anno_selezionato}.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+
     st.download_button(
         "Scarica Excel",
         data=excel_formattato,
         file_name=f"smart_calendar_{anno_selezionato}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True
+    )
+
+    st.download_button(
+        "Scarica PDF riepilogo",
+        data=pdf_riepilogo,
+        file_name=f"smart_calendar_{anno_selezionato}_riepilogo.pdf",
+        mime="application/pdf",
         use_container_width=True
     )

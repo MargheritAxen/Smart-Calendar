@@ -4,3 +4,4 @@ openpyxl
 gspread
 google-auth
 holidays
+reportlab
