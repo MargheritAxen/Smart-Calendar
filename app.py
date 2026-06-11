@@ -5,6 +5,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import date, timedelta
 from io import BytesIO
+import calendar
 
 st.set_page_config(
     page_title="Smart Calendar",
@@ -12,7 +13,8 @@ st.set_page_config(
     layout="centered"
 )
 
-STATI = ["Ufficio", "Smart", "Assenza"]
+# ===== CONFIG =====
+STATI = ["Ufficio", "Smart", "Ferie", "Malattia", "Joe"]
 PERSONE = ["Margherita", "Roberto"]
 
 NOME_FILE_GOOGLE_SHEETS = "Smart Calendar"
@@ -22,6 +24,40 @@ FOGLIO_FESTE = "festivita_manuali"
 FOGLIO_RIEPILOGO = "riepilogo"
 
 festivita_italiane = holidays.Italy()
+
+CODICI = {
+    "Ufficio": "UFF",
+    "Smart": "LAW",
+    "Ferie": "FER",
+    "Malattia": "MAL",
+    "Joe": "JOE",
+    "Assenza": "FER",
+}
+
+COLORI = {
+    "UFF": "#ff8a00",
+    "LAW": "#19e635",
+    "FER": "#8a078a",
+    "MAL": "#fff200",
+    "JOE": "#6f42c1",
+    "LIB": "#d9d9d9",
+}
+
+st.markdown("""
+<style>
+.block-container { padding-top: 1.3rem; max-width: 760px; }
+.smart-title { font-size: 2.4rem; font-weight: 800; margin-bottom: 0.2rem; }
+.legend-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 20px 0; }
+.legend-chip { padding: 7px 10px; border-radius: 999px; font-weight: 800; font-size: 0.82rem; border: 1px solid rgba(255,255,255,0.18); }
+.month-title { text-align: center; font-size: 1.6rem; font-weight: 800; margin: 14px 0 10px 0; }
+.mobile-calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; width: 100%; }
+.day-head { text-align: center; font-weight: 800; padding: 7px 0; background: rgba(255,255,255,0.08); border-radius: 7px; }
+.day-cell { min-height: 68px; border-radius: 8px; padding: 5px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.10); overflow: hidden; }
+.day-num { font-weight: 900; font-size: 0.9rem; margin-bottom: 4px; }
+.day-code { display: block; text-align: center; font-weight: 900; font-size: 1rem; line-height: 1.1rem; }
+.last-card { padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.09); margin-bottom: 8px; }
+</style>
+""", unsafe_allow_html=True)
 
 
 @st.cache_resource
@@ -50,10 +86,7 @@ def connetti_google_sheets():
 def inizializza_fogli():
     spreadsheet = connetti_google_sheets()
 
-    fogli_esistenti = {
-        ws.title: ws
-        for ws in spreadsheet.worksheets()
-    }
+    fogli_esistenti = {ws.title: ws for ws in spreadsheet.worksheets()}
 
     def crea_o_prendi(nome_foglio, intestazioni):
         if nome_foglio in fogli_esistenti:
@@ -64,36 +97,21 @@ def inizializza_fogli():
                 rows=1000,
                 cols=len(intestazioni)
             )
-            worksheet.update("A1", [intestazioni])
+            worksheet.update(values=[intestazioni], range_name="A1")
 
         valori = worksheet.get_all_values()
-
         if len(valori) == 0:
-            worksheet.update("A1", [intestazioni])
+            worksheet.update(values=[intestazioni], range_name="A1")
 
         return worksheet
 
-    ws_presenze = crea_o_prendi(
-        FOGLIO_PRESENZE,
-        ["data", "persona", "stato"]
-    )
-
-    ws_feste = crea_o_prendi(
-        FOGLIO_FESTE,
-        ["data", "descrizione"]
-    )
-
+    ws_presenze = crea_o_prendi(FOGLIO_PRESENZE, ["data", "persona", "stato"])
+    ws_feste = crea_o_prendi(FOGLIO_FESTE, ["data", "descrizione"])
     ws_riepilogo = crea_o_prendi(
         FOGLIO_RIEPILOGO,
         [
-            "persona",
-            "trimestre",
-            "Ufficio",
-            "Smart",
-            "Giorni lavorati",
-            "% Ufficio",
-            "% Smart",
-            "Esito"
+            "persona", "trimestre", "UFF", "LAW", "FER", "MAL", "JOE",
+            "Giorni conteggiati", "% UFF", "% LAW", "Esito"
         ]
     )
 
@@ -112,22 +130,21 @@ def inizializza_fogli():
 
 spreadsheet, ws_presenze, ws_feste, ws_riepilogo = inizializza_fogli()
 
-# ===== FESTIVITÀ EXTRA AZIENDALI BLOCCATE =====
+
 def feste_extra_aziendali(anno):
-    """Festività aggiuntive da trattare come weekend: grigie e non selezionabili."""
     from dateutil.easter import easter
 
     pasqua = easter(anno)
 
     return {
-        date(anno, 3, 19),              # San Giuseppe
-        pasqua + timedelta(days=39),    # Ascensione
-        pasqua + timedelta(days=60),    # Corpus Domini
-        date(anno, 11, 4),              # Festa dell'Unità Nazionale
-        date(anno, 12, 8),              # Milano / Immacolata
-        date(anno, 11, 2),              # Commemorazione dei Defunti
-        date(anno, 12, 24),             # Vigilia di Natale
-        date(anno, 12, 31),             # San Silvestro
+        date(anno, 3, 19),
+        pasqua + timedelta(days=39),
+        pasqua + timedelta(days=60),
+        date(anno, 11, 4),
+        date(anno, 12, 8),
+        date(anno, 11, 2),
+        date(anno, 12, 24),
+        date(anno, 12, 31),
     }
 
 
@@ -141,316 +158,21 @@ def date_festive_manuali(df_feste):
     return set(tmp["data"].dt.date)
 
 
-# ===== EXPORT EXCEL FORMATTATO =====
-def genera_excel_formattato(df, df_feste, riepilogo, anno):
-    from io import BytesIO
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
-    from openpyxl.utils import get_column_letter
-    from openpyxl.worksheet.datavalidation import DataValidation
-    import calendar
-
-    buffer = BytesIO()
-    wb = Workbook()
-    ws = wb.active
-    ws.title = str(anno)
-    ws_riep = wb.create_sheet("Riepilogo")
-
-    codici = {
-        "Ufficio": "PRE",
-        "Smart": "LAW",
-        "Assenza": "ASS"
-    }
-
-    persone = PERSONE
-    mesi = [
-        "GENNAIO", "FEBBRAIO", "MARZO", "APRILE", "MAGGIO", "GIUGNO",
-        "LUGLIO", "AGOSTO", "SETTEMBRE", "OTTOBRE", "NOVEMBRE", "DICEMBRE"
-    ]
-    giorni_it = ["Lu", "Ma", "Me", "Gi", "Ve", "Sa", "Do"]
-    feste_extra = feste_extra_aziendali(anno)
+def is_giorno_bloccato(giorno, df_feste):
+    giorno = pd.to_datetime(giorno).date()
+    feste_extra = feste_extra_aziendali(giorno.year)
     feste_manuali = date_festive_manuali(df_feste)
 
-    fill_header = PatternFill("solid", fgColor="D9EAF7")
-    fill_month = PatternFill("solid", fgColor="1F4E78")
-    fill_legend = PatternFill("solid", fgColor="E2F0D9")
-    fill_weekend = PatternFill("solid", fgColor="E7E6E6")
-    fill_ass = PatternFill("solid", fgColor="F4CCCC")
-    fill_pre = PatternFill("solid", fgColor="D9EAD3")
-    fill_law = PatternFill("solid", fgColor="CFE2F3")
-    thin = Side(style="thin", color="B7B7B7")
-    border = Border(left=thin, right=thin, top=thin, bottom=thin)
-
-    # Dizionario rapido: (data, persona) -> codice
-    presenze = df.copy()
-    if not presenze.empty:
-        presenze["data"] = pd.to_datetime(presenze["data"]).dt.date
-        presenze["codice"] = presenze["stato"].map(codici).fillna(presenze["stato"])
-        lookup = {
-            (r["data"], r["persona"]): r["codice"]
-            for _, r in presenze.iterrows()
-        }
-    else:
-        lookup = {}
-
-    # Legenda
-    ws["A1"] = "LEGENDA"
-    ws["A1"].font = Font(bold=True)
-    legenda = [("ASS", "Assenza"), ("PRE", "Lavoro in presenza"), ("LAW", "Smart working")]
-    for i, (codice, descrizione) in enumerate(legenda, start=2):
-        ws[f"A{i}"] = codice
-        ws[f"B{i}"] = descrizione
-        ws[f"A{i}"].font = Font(bold=True)
-        ws[f"A{i}"].fill = fill_legend
-        ws[f"A{i}"].border = border
-        ws[f"B{i}"].border = border
-
-    start_cols = [1, 6, 11]  # 3 mesi per riga
-    start_rows = [7, 44, 81, 118]
-
-    for month in range(1, 13):
-        block_col = start_cols[(month - 1) % 3]
-        block_row = start_rows[(month - 1) // 3]
-
-        ws.merge_cells(start_row=block_row, start_column=block_col, end_row=block_row, end_column=block_col + 3)
-        c = ws.cell(block_row, block_col, mesi[month - 1])
-        c.font = Font(bold=True, color="FFFFFF")
-        c.fill = fill_month
-        c.alignment = Alignment(horizontal="center")
-
-        headers = ["Giorno", "Sett."] + persone
-        for j, h in enumerate(headers):
-            cell = ws.cell(block_row + 1, block_col + j, h)
-            cell.font = Font(bold=True)
-            cell.fill = fill_header
-            cell.border = border
-            cell.alignment = Alignment(horizontal="center")
-
-        days = calendar.monthrange(anno, month)[1]
-        for day in range(1, days + 1):
-            row = block_row + 1 + day
-            data = pd.Timestamp(year=anno, month=month, day=day).date()
-            weekday = data.weekday()
-            is_festivo = (
-                data in festivita_italiane
-                or data in feste_extra
-                or data in feste_manuali
-            )
-            values = [day, giorni_it[weekday]]
-            for persona in persone:
-                values.append(lookup.get((data, persona), ""))
-
-            for j, value in enumerate(values):
-                cell = ws.cell(row, block_col + j, value)
-                cell.border = border
-                cell.alignment = Alignment(horizontal="center")
-                if weekday >= 5 or is_festivo:
-                    cell.fill = fill_weekend
-                    cell.font = Font(bold=True, color="666666")
-                elif value == "ASS":
-                    cell.fill = fill_ass
-                elif value == "PRE":
-                    cell.fill = fill_pre
-                elif value == "LAW":
-                    cell.fill = fill_law
-
-    # Validazione solo sulle celle realmente compilabili.
-    # Weekend, festività italiane, festività extra aziendali e festività manuali restano bloccate visivamente.
-    dv = DataValidation(type="list", formula1='"ASS,PRE,LAW"', allow_blank=True)
-    ws.add_data_validation(dv)
-
-    for month in range(1, 13):
-        block_col = start_cols[(month - 1) % 3]
-        block_row = start_rows[(month - 1) // 3]
-        days = calendar.monthrange(anno, month)[1]
-
-        for day in range(1, days + 1):
-            data = pd.Timestamp(year=anno, month=month, day=day).date()
-            weekday = data.weekday()
-            is_festivo = (
-                data in festivita_italiane
-                or data in feste_extra
-                or data in feste_manuali
-            )
-
-            if weekday >= 5 or is_festivo:
-                continue
-
-            excel_row = block_row + 1 + day
-            for p_idx in range(len(persone)):
-                cell_ref = f"{get_column_letter(block_col + 2 + p_idx)}{excel_row}"
-                dv.add(cell_ref)
-
-    for col in range(1, 16):
-        ws.column_dimensions[get_column_letter(col)].width = 13
-
-    # Riepilogo leggibile
-    ws_riep["A1"] = "RIEPILOGO PRESENZE"
-    ws_riep["A1"].font = Font(bold=True, size=14)
-
-    headers = ["Persona", "Periodo", "PRE", "LAW", "ASS", "Totale", "% PRE", "% LAW", "% ASS"]
-    for j, h in enumerate(headers, start=1):
-        cell = ws_riep.cell(3, j, h)
-        cell.font = Font(bold=True)
-        cell.fill = fill_header
-        cell.border = border
-        cell.alignment = Alignment(horizontal="center")
-
-    df_r = df.copy()
-    if not df_r.empty:
-        df_r["data"] = pd.to_datetime(df_r["data"])
-        df_r["periodo"] = df_r["data"].dt.to_period("Q").astype(str)
-        df_r["codice"] = df_r["stato"].map(codici).fillna(df_r["stato"])
-        pivot = (
-            df_r.groupby(["persona", "periodo", "codice"])
-            .size()
-            .unstack(fill_value=0)
-            .reset_index()
-        )
-        for col in ["PRE", "LAW", "ASS"]:
-            if col not in pivot.columns:
-                pivot[col] = 0
-        pivot["Totale"] = pivot[["PRE", "LAW", "ASS"]].sum(axis=1)
-        for col in ["PRE", "LAW", "ASS"]:
-            pivot[f"% {col}"] = (pivot[col] / pivot["Totale"]).fillna(0)
-
-        pivot = pivot[["persona", "periodo", "PRE", "LAW", "ASS", "Totale", "% PRE", "% LAW", "% ASS"]]
-        for i, (_, r) in enumerate(pivot.iterrows(), start=4):
-            for j, value in enumerate(r.tolist(), start=1):
-                cell = ws_riep.cell(i, j, value)
-                cell.border = border
-                cell.alignment = Alignment(horizontal="center")
-                if j >= 7:
-                    cell.number_format = "0.00%"
-
-    for col in range(1, 10):
-        ws_riep.column_dimensions[get_column_letter(col)].width = 15
-
-    wb.save(buffer)
-    return buffer.getvalue()
-
-
-def genera_pdf_presenze(df, anno):
-    """Genera un PDF calendario presenze, leggibile da iPhone, con un mese per pagina."""
-    from io import BytesIO
-    from datetime import date
-    import calendar
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib import colors
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
-    from reportlab.lib.styles import getSampleStyleSheet
-
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
-        rightMargin=18,
-        leftMargin=18,
-        topMargin=18,
-        bottomMargin=18,
+    return (
+        giorno.weekday() >= 5
+        or giorno in festivita_italiane
+        or giorno in feste_extra
+        or giorno in feste_manuali
     )
 
-    styles = getSampleStyleSheet()
-    elementi = []
 
-    codici = {
-        "Ufficio": "PRE",
-        "Smart": "LAW",
-        "Assenza": "ASS"
-    }
-
-    mesi = [
-        "GENNAIO", "FEBBRAIO", "MARZO", "APRILE", "MAGGIO", "GIUGNO",
-        "LUGLIO", "AGOSTO", "SETTEMBRE", "OTTOBRE", "NOVEMBRE", "DICEMBRE"
-    ]
-    giorni_it = ["Lu", "Ma", "Me", "Gi", "Ve", "Sa", "Do"]
-
-    colore_header = colors.HexColor("#D9EAF7")
-    colore_mese = colors.HexColor("#1F4E78")
-    colore_weekend_festivi = colors.HexColor("#E7E6E6")
-    colore_ass = colors.HexColor("#F4CCCC")
-    colore_pre = colors.HexColor("#D9EAD3")
-    colore_law = colors.HexColor("#CFE2F3")
-
-    persone = PERSONE
-
-    presenze = df.copy()
-    if not presenze.empty:
-        presenze["data"] = pd.to_datetime(presenze["data"]).dt.date
-        presenze["codice"] = presenze["stato"].map(codici).fillna(presenze["stato"])
-        lookup = {
-            (r["data"], r["persona"]): r["codice"]
-            for _, r in presenze.iterrows()
-        }
-    else:
-        lookup = {}
-
-    feste_extra = feste_extra_aziendali(anno)
-
-    for month in range(1, 13):
-        elementi.append(Paragraph(f"{mesi[month - 1]} {anno}", styles["Title"]))
-        elementi.append(Spacer(1, 8))
-
-        dati_tabella = [["Giorno", "Sett."] + persone]
-        row_status = []
-
-        days = calendar.monthrange(anno, month)[1]
-        for day in range(1, days + 1):
-            data = date(anno, month, day)
-            weekday = data.weekday()
-            is_festivo = (
-                data in festivita_italiane
-                or data in feste_extra
-            )
-
-            riga = [str(day), giorni_it[weekday]]
-            for persona in persone:
-                riga.append(lookup.get((data, persona), ""))
-
-            dati_tabella.append(riga)
-            row_status.append({
-                "weekend_o_festivo": weekday >= 5 or is_festivo,
-                "valori": riga,
-            })
-
-        col_widths = [42, 42] + [78 for _ in persone]
-        tabella = Table(dati_tabella, repeatRows=1, colWidths=col_widths)
-
-        stile = TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colore_header),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
-            ("FONTSIZE", (0, 0), (-1, -1), 8),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-            ("TOPPADDING", (0, 0), (-1, -1), 5),
-        ])
-
-        for idx, info in enumerate(row_status, start=1):
-            if info["weekend_o_festivo"]:
-                stile.add("BACKGROUND", (0, idx), (-1, idx), colore_weekend_festivi)
-                stile.add("FONTNAME", (0, idx), (-1, idx), "Helvetica-Bold")
-                stile.add("TEXTCOLOR", (0, idx), (-1, idx), colors.HexColor("#666666"))
-            else:
-                for col_idx, valore in enumerate(info["valori"]):
-                    if valore == "ASS":
-                        stile.add("BACKGROUND", (col_idx, idx), (col_idx, idx), colore_ass)
-                    elif valore == "PRE":
-                        stile.add("BACKGROUND", (col_idx, idx), (col_idx, idx), colore_pre)
-                    elif valore == "LAW":
-                        stile.add("BACKGROUND", (col_idx, idx), (col_idx, idx), colore_law)
-
-        tabella.setStyle(stile)
-        elementi.append(tabella)
-
-        if month < 12:
-            elementi.append(PageBreak())
-
-    doc.build(elementi)
-    return buffer.getvalue()
-
+def codice_stato(stato):
+    return CODICI.get(stato, stato)
 
 
 @st.cache_data(ttl=30)
@@ -463,7 +185,6 @@ def leggi_presenze_cache():
     df = pd.DataFrame(dati)
     df["data"] = pd.to_datetime(df["data"], errors="coerce")
     df = df.dropna(subset=["data"])
-
     return df
 
 
@@ -477,7 +198,6 @@ def leggi_feste_cache():
     df = pd.DataFrame(dati)
     df["data"] = pd.to_datetime(df["data"], errors="coerce")
     df = df.dropna(subset=["data"])
-
     return df
 
 
@@ -499,7 +219,7 @@ def salva_presenze(df):
     df["data"] = pd.to_datetime(df["data"]).dt.strftime("%Y-%m-%d")
 
     ws_presenze.clear()
-    ws_presenze.update("A1", [["data", "persona", "stato"]])
+    ws_presenze.update(values=[["data", "persona", "stato"]], range_name="A1")
 
     if not df.empty:
         ws_presenze.append_rows(df.values.tolist())
@@ -507,12 +227,36 @@ def salva_presenze(df):
     svuota_cache_dati()
 
 
-# ===== IMPORT AUTOMATICO PRESENZE STORICHE MARgherita =====
+def salva_feste_manuali(df):
+    df = df.copy()
+    df["data"] = pd.to_datetime(df["data"]).dt.strftime("%Y-%m-%d")
+
+    ws_feste.clear()
+    ws_feste.update(values=[["data", "descrizione"]], range_name="A1")
+
+    if not df.empty:
+        ws_feste.append_rows(df.values.tolist())
+
+    svuota_cache_dati()
+
+
+def salva_riepilogo(riepilogo):
+    intestazioni = [
+        "persona", "trimestre", "UFF", "LAW", "FER", "MAL", "JOE",
+        "Giorni conteggiati", "% UFF", "% LAW", "Esito"
+    ]
+
+    ws_riepilogo.clear()
+    ws_riepilogo.update(values=[intestazioni], range_name="A1")
+
+    if not riepilogo.empty:
+        ws_riepilogo.append_rows(riepilogo[intestazioni].values.tolist())
+
+
 IMPORT_PRESENZE_MARGHERITA = [('2026-01-02', 'Margherita', 'Smart'), ('2026-01-05', 'Margherita', 'Ufficio'), ('2026-01-07', 'Margherita', 'Ufficio'), ('2026-01-08', 'Margherita', 'Smart'), ('2026-01-09', 'Margherita', 'Ufficio'), ('2026-01-12', 'Margherita', 'Smart'), ('2026-01-13', 'Margherita', 'Ufficio'), ('2026-01-14', 'Margherita', 'Ufficio'), ('2026-01-15', 'Margherita', 'Assenza'), ('2026-01-16', 'Margherita', 'Smart'), ('2026-01-19', 'Margherita', 'Assenza'), ('2026-01-20', 'Margherita', 'Smart'), ('2026-01-21', 'Margherita', 'Ufficio'), ('2026-01-22', 'Margherita', 'Ufficio'), ('2026-01-23', 'Margherita', 'Ufficio'), ('2026-01-26', 'Margherita', 'Ufficio'), ('2026-01-27', 'Margherita', 'Smart'), ('2026-01-28', 'Margherita', 'Ufficio'), ('2026-01-29', 'Margherita', 'Smart'), ('2026-01-30', 'Margherita', 'Smart'), ('2026-02-02', 'Margherita', 'Smart'), ('2026-02-03', 'Margherita', 'Assenza'), ('2026-02-04', 'Margherita', 'Smart'), ('2026-02-05', 'Margherita', 'Smart'), ('2026-02-06', 'Margherita', 'Assenza'), ('2026-02-09', 'Margherita', 'Smart'), ('2026-02-10', 'Margherita', 'Ufficio'), ('2026-02-11', 'Margherita', 'Smart'), ('2026-02-12', 'Margherita', 'Ufficio'), ('2026-02-13', 'Margherita', 'Ufficio'), ('2026-02-16', 'Margherita', 'Ufficio'), ('2026-02-17', 'Margherita', 'Smart'), ('2026-02-18', 'Margherita', 'Smart'), ('2026-02-19', 'Margherita', 'Ufficio'), ('2026-02-20', 'Margherita', 'Smart'), ('2026-02-23', 'Margherita', 'Ufficio'), ('2026-02-24', 'Margherita', 'Smart'), ('2026-02-25', 'Margherita', 'Ufficio'), ('2026-02-26', 'Margherita', 'Ufficio'), ('2026-02-27', 'Margherita', 'Smart'), ('2026-03-02', 'Margherita', 'Ufficio'), ('2026-03-03', 'Margherita', 'Smart'), ('2026-03-04', 'Margherita', 'Smart'), ('2026-03-05', 'Margherita', 'Smart'), ('2026-03-06', 'Margherita', 'Ufficio'), ('2026-03-09', 'Margherita', 'Ufficio'), ('2026-03-10', 'Margherita', 'Smart'), ('2026-03-11', 'Margherita', 'Ufficio'), ('2026-03-12', 'Margherita', 'Ufficio'), ('2026-03-13', 'Margherita', 'Ufficio'), ('2026-03-16', 'Margherita', 'Ufficio'), ('2026-03-17', 'Margherita', 'Smart'), ('2026-03-18', 'Margherita', 'Smart'), ('2026-03-19', 'Margherita', 'Assenza'), ('2026-03-20', 'Margherita', 'Assenza'), ('2026-03-23', 'Margherita', 'Assenza'), ('2026-03-24', 'Margherita', 'Assenza'), ('2026-03-25', 'Margherita', 'Assenza'), ('2026-03-26', 'Margherita', 'Assenza'), ('2026-03-27', 'Margherita', 'Smart'), ('2026-03-30', 'Margherita', 'Smart'), ('2026-03-31', 'Margherita', 'Smart'), ('2026-04-01', 'Margherita', 'Smart'), ('2026-04-02', 'Margherita', 'Assenza'), ('2026-04-07', 'Margherita', 'Assenza'), ('2026-04-08', 'Margherita', 'Assenza'), ('2026-04-09', 'Margherita', 'Ufficio'), ('2026-04-10', 'Margherita', 'Ufficio'), ('2026-04-13', 'Margherita', 'Ufficio'), ('2026-04-14', 'Margherita', 'Ufficio'), ('2026-04-15', 'Margherita', 'Smart'), ('2026-04-16', 'Margherita', 'Ufficio'), ('2026-04-17', 'Margherita', 'Smart'), ('2026-04-20', 'Margherita', 'Ufficio'), ('2026-04-21', 'Margherita', 'Smart'), ('2026-04-22', 'Margherita', 'Ufficio'), ('2026-04-23', 'Margherita', 'Smart'), ('2026-04-24', 'Margherita', 'Smart'), ('2026-04-27', 'Margherita', 'Ufficio'), ('2026-04-28', 'Margherita', 'Smart'), ('2026-04-29', 'Margherita', 'Ufficio'), ('2026-04-30', 'Margherita', 'Smart'), ('2026-05-04', 'Margherita', 'Ufficio'), ('2026-05-05', 'Margherita', 'Smart'), ('2026-05-06', 'Margherita', 'Smart'), ('2026-05-07', 'Margherita', 'Smart'), ('2026-05-08', 'Margherita', 'Ufficio'), ('2026-05-11', 'Margherita', 'Ufficio'), ('2026-05-12', 'Margherita', 'Smart'), ('2026-05-13', 'Margherita', 'Ufficio'), ('2026-05-14', 'Margherita', 'Smart'), ('2026-05-15', 'Margherita', 'Ufficio'), ('2026-05-18', 'Margherita', 'Assenza'), ('2026-05-19', 'Margherita', 'Assenza'), ('2026-05-20', 'Margherita', 'Assenza'), ('2026-05-21', 'Margherita', 'Assenza'), ('2026-05-22', 'Margherita', 'Smart'), ('2026-05-25', 'Margherita', 'Ufficio'), ('2026-05-26', 'Margherita', 'Assenza'), ('2026-05-27', 'Margherita', 'Smart'), ('2026-05-28', 'Margherita', 'Smart'), ('2026-05-29', 'Margherita', 'Assenza'), ('2026-06-01', 'Margherita', 'Assenza'), ('2026-06-03', 'Margherita', 'Ufficio'), ('2026-06-04', 'Margherita', 'Smart'), ('2026-06-05', 'Margherita', 'Smart'), ('2026-06-08', 'Margherita', 'Smart'), ('2026-06-09', 'Margherita', 'Smart')]
 
 
 def importa_presenze_margherita_una_volta():
-    """Carica nello sheet Google le presenze storiche di Margherita, senza duplicarle."""
     valori = ws_presenze.get_all_records()
     esistenti = set()
 
@@ -537,38 +281,6 @@ def importa_presenze_margherita_una_volta():
     return len(righe_da_aggiungere)
 
 
-def salva_feste_manuali(df):
-    df = df.copy()
-    df["data"] = pd.to_datetime(df["data"]).dt.strftime("%Y-%m-%d")
-
-    ws_feste.clear()
-    ws_feste.update("A1", [["data", "descrizione"]])
-
-    if not df.empty:
-        ws_feste.append_rows(df.values.tolist())
-
-    svuota_cache_dati()
-
-
-def salva_riepilogo(riepilogo):
-    intestazioni = [
-        "persona",
-        "trimestre",
-        "Ufficio",
-        "Smart",
-        "Giorni lavorati",
-        "% Ufficio",
-        "% Smart",
-        "Esito"
-    ]
-
-    ws_riepilogo.clear()
-    ws_riepilogo.update("A1", [intestazioni])
-
-    if not riepilogo.empty:
-        ws_riepilogo.append_rows(riepilogo[intestazioni].values.tolist())
-
-
 def calcola_riepilogo(df, df_feste):
     if df.empty:
         return pd.DataFrame(), pd.DataFrame()
@@ -577,31 +289,16 @@ def calcola_riepilogo(df, df_feste):
     df["data"] = pd.to_datetime(df["data"], errors="coerce")
     df = df.dropna(subset=["data"])
 
-    if df_feste.empty:
-        date_feste_manuali = set()
-    else:
-        df_feste = df_feste.copy()
-        df_feste["data"] = pd.to_datetime(df_feste["data"], errors="coerce")
-        df_feste = df_feste.dropna(subset=["data"])
-        date_feste_manuali = set(df_feste["data"].dt.date)
+    date_feste_manuali = date_festive_manuali(df_feste)
 
     date_feste_extra = set()
     for anno in df["data"].dt.year.dropna().unique():
         date_feste_extra.update(feste_extra_aziendali(int(anno)))
 
     df["weekend"] = df["data"].dt.weekday >= 5
-
-    df["festivo_italia"] = df["data"].dt.date.apply(
-        lambda x: x in festivita_italiane
-    )
-
-    df["festivo_manuale"] = df["data"].dt.date.apply(
-        lambda x: x in date_feste_manuali
-    )
-
-    df["festivo_extra"] = df["data"].dt.date.apply(
-        lambda x: x in date_feste_extra
-    )
+    df["festivo_italia"] = df["data"].dt.date.apply(lambda x: x in festivita_italiane)
+    df["festivo_manuale"] = df["data"].dt.date.apply(lambda x: x in date_feste_manuali)
+    df["festivo_extra"] = df["data"].dt.date.apply(lambda x: x in date_feste_extra)
 
     df_valido = df[
         (~df["weekend"]) &
@@ -610,56 +307,370 @@ def calcola_riepilogo(df, df_feste):
         (~df["festivo_extra"])
     ].copy()
 
-    lavorati = df_valido[
-        df_valido["stato"].isin(["Ufficio", "Smart"])
-    ].copy()
-
-    if lavorati.empty:
+    if df_valido.empty:
         return pd.DataFrame(), df_valido
 
-    lavorati["trimestre"] = lavorati["data"].dt.to_period("Q").astype(str)
+    df_valido["trimestre"] = df_valido["data"].dt.to_period("Q").astype(str)
+    df_valido["codice"] = df_valido["stato"].map(CODICI).fillna(df_valido["stato"])
 
     riepilogo = (
-        lavorati
-        .groupby(["persona", "trimestre", "stato"])
+        df_valido
+        .groupby(["persona", "trimestre", "codice"])
         .size()
         .unstack(fill_value=0)
         .reset_index()
     )
 
-    for col in ["Ufficio", "Smart"]:
+    for col in ["UFF", "LAW", "FER", "MAL", "JOE"]:
         if col not in riepilogo.columns:
             riepilogo[col] = 0
 
-    riepilogo["Giorni lavorati"] = (
-        riepilogo["Ufficio"] + riepilogo["Smart"]
-    )
+    riepilogo["Giorni conteggiati"] = riepilogo["UFF"] + riepilogo["LAW"]
 
-    riepilogo["% Ufficio"] = (
-        riepilogo["Ufficio"] / riepilogo["Giorni lavorati"] * 100
-    ).round(2)
+    riepilogo["% UFF"] = (
+        riepilogo["UFF"] / riepilogo["Giorni conteggiati"] * 100
+    ).replace([float("inf"), -float("inf")], 0).fillna(0).round(2)
 
-    riepilogo["% Smart"] = (
-        riepilogo["Smart"] / riepilogo["Giorni lavorati"] * 100
-    ).round(2)
+    riepilogo["% LAW"] = (
+        riepilogo["LAW"] / riepilogo["Giorni conteggiati"] * 100
+    ).replace([float("inf"), -float("inf")], 0).fillna(0).round(2)
 
     riepilogo["Esito"] = riepilogo.apply(
-        lambda r: "OK" if 40 <= r["% Ufficio"] <= 60 else "KO",
+        lambda r: "OK" if r["Giorni conteggiati"] > 0 and 40 <= r["% UFF"] <= 60 else "KO",
         axis=1
     )
 
     ordine_colonne = [
-        "persona",
-        "trimestre",
-        "Ufficio",
-        "Smart",
-        "Giorni lavorati",
-        "% Ufficio",
-        "% Smart",
-        "Esito"
+        "persona", "trimestre", "UFF", "LAW", "FER", "MAL", "JOE",
+        "Giorni conteggiati", "% UFF", "% LAW", "Esito"
     ]
 
     return riepilogo[ordine_colonne], df_valido
+
+
+def render_legenda():
+    html = '<div class="legend-row">'
+    for codice in ["UFF", "LAW", "FER", "MAL", "JOE", "LIB"]:
+        color = COLORI[codice]
+        html += f'<span class="legend-chip" style="background:{color};color:#000000;">{codice}</span>'
+    html += '</div>'
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def render_calendario_mese(df, df_feste, persona, anno, mese):
+    mesi_it = [
+        "GENNAIO", "FEBBRAIO", "MARZO", "APRILE", "MAGGIO", "GIUGNO",
+        "LUGLIO", "AGOSTO", "SETTEMBRE", "OTTOBRE", "NOVEMBRE", "DICEMBRE"
+    ]
+    giorni = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"]
+
+    lookup = {}
+    if not df.empty:
+        tmp = df.copy()
+        tmp["data"] = pd.to_datetime(tmp["data"]).dt.date
+        tmp["codice"] = tmp["stato"].map(CODICI).fillna(tmp["stato"])
+        tmp = tmp[tmp["persona"] == persona]
+        lookup = {r["data"]: r["codice"] for _, r in tmp.iterrows()}
+
+    primo_giorno, giorni_mese = calendar.monthrange(anno, mese)
+
+    html = f'<div class="month-title">{mesi_it[mese - 1]} {anno}</div>'
+    html += '<div class="mobile-calendar">'
+    for g in giorni:
+        html += f'<div class="day-head">{g}</div>'
+
+    for _ in range(primo_giorno):
+        html += '<div class="day-cell" style="opacity:0.25;"></div>'
+
+    for day in range(1, giorni_mese + 1):
+        data = date(anno, mese, day)
+        bloccato = is_giorno_bloccato(data, df_feste)
+        codice = "LIB" if bloccato else lookup.get(data, "")
+        bg = COLORI.get(codice, "rgba(255,255,255,0.04)")
+        color = "#000000" if codice else "inherit"
+
+        html += f"""
+        <div class="day-cell" style="background:{bg};color:{color};">
+            <div class="day-num">{day}</div>
+            <span class="day-code">{codice}</span>
+        </div>
+        """
+
+    html += '</div>'
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def genera_excel_formattato(df, df_feste, riepilogo, anno):
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
+    from openpyxl.utils import get_column_letter
+    from openpyxl.worksheet.datavalidation import DataValidation
+
+    buffer = BytesIO()
+    wb = Workbook()
+    ws = wb.active
+    ws.title = str(anno)
+    ws_riep = wb.create_sheet("Riepilogo")
+
+    persone = PERSONE
+    mesi = [
+        "GENNAIO", "FEBBRAIO", "MARZO", "APRILE", "MAGGIO", "GIUGNO",
+        "LUGLIO", "AGOSTO", "SETTEMBRE", "OTTOBRE", "NOVEMBRE", "DICEMBRE"
+    ]
+    giorni_it = ["Lu", "Ma", "Me", "Gi", "Ve", "Sa", "Do"]
+
+    feste_extra = feste_extra_aziendali(anno)
+    feste_manuali = date_festive_manuali(df_feste)
+
+    fill_header = PatternFill("solid", fgColor="D9EAF7")
+    fill_month = PatternFill("solid", fgColor="1F4E78")
+    fill_uff = PatternFill("solid", fgColor="F9CB9C")
+    fill_law = PatternFill("solid", fgColor="B6D7A8")
+    fill_fer = PatternFill("solid", fgColor="D5A6BD")
+    fill_mal = PatternFill("solid", fgColor="FFF2CC")
+    fill_joe = PatternFill("solid", fgColor="D9D2E9")
+    fill_lib = PatternFill("solid", fgColor="D9D9D9")
+
+    thin = Side(style="thin", color="B7B7B7")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    presenze = df.copy()
+    if not presenze.empty:
+        presenze["data"] = pd.to_datetime(presenze["data"]).dt.date
+        presenze["codice"] = presenze["stato"].map(CODICI).fillna(presenze["stato"])
+        lookup = {(r["data"], r["persona"]): r["codice"] for _, r in presenze.iterrows()}
+    else:
+        lookup = {}
+
+    ws["A1"] = "LEGENDA"
+    ws["A1"].font = Font(bold=True)
+    legenda = [
+        ("UFF", "Presenza"),
+        ("LAW", "Smart working"),
+        ("FER", "Ferie - non conta"),
+        ("MAL", "Malattia - non conta"),
+        ("JOE", "Jolly - non conta"),
+        ("LIB", "Giorno libero/festivo - non conta"),
+    ]
+    for i, (codice, descrizione) in enumerate(legenda, start=2):
+        ws[f"A{i}"] = codice
+        ws[f"B{i}"] = descrizione
+        ws[f"A{i}"].font = Font(bold=True)
+        ws[f"A{i}"].border = border
+        ws[f"B{i}"].border = border
+
+    start_cols = [1, 6, 11]
+    start_rows = [10, 47, 84, 121]
+
+    codice_fill = {
+        "UFF": fill_uff,
+        "LAW": fill_law,
+        "FER": fill_fer,
+        "MAL": fill_mal,
+        "JOE": fill_joe,
+        "LIB": fill_lib,
+    }
+
+    for month in range(1, 13):
+        block_col = start_cols[(month - 1) % 3]
+        block_row = start_rows[(month - 1) // 3]
+
+        ws.merge_cells(start_row=block_row, start_column=block_col, end_row=block_row, end_column=block_col + 3)
+        c = ws.cell(block_row, block_col, mesi[month - 1])
+        c.font = Font(bold=True, color="FFFFFF")
+        c.fill = fill_month
+        c.alignment = Alignment(horizontal="center")
+
+        headers = ["Giorno", "Sett."] + persone
+        for j, h in enumerate(headers):
+            cell = ws.cell(block_row + 1, block_col + j, h)
+            cell.font = Font(bold=True)
+            cell.fill = fill_header
+            cell.border = border
+            cell.alignment = Alignment(horizontal="center")
+
+        days = calendar.monthrange(anno, month)[1]
+        for day in range(1, days + 1):
+            row = block_row + 1 + day
+            data = date(anno, month, day)
+            weekday = data.weekday()
+            is_festivo = data in festivita_italiane or data in feste_extra or data in feste_manuali
+
+            values = [day, giorni_it[weekday]]
+            for persona in persone:
+                values.append("LIB" if weekday >= 5 or is_festivo else lookup.get((data, persona), ""))
+
+            for j, value in enumerate(values):
+                cell = ws.cell(row, block_col + j, value)
+                cell.border = border
+                cell.alignment = Alignment(horizontal="center")
+                if value in codice_fill:
+                    cell.fill = codice_fill[value]
+                    cell.font = Font(bold=True, color="000000")
+
+    dv = DataValidation(type="list", formula1='"UFF,LAW,FER,MAL,JOE"', allow_blank=True)
+    ws.add_data_validation(dv)
+
+    for month in range(1, 13):
+        block_col = start_cols[(month - 1) % 3]
+        block_row = start_rows[(month - 1) // 3]
+        days = calendar.monthrange(anno, month)[1]
+
+        for day in range(1, days + 1):
+            data = date(anno, month, day)
+            if is_giorno_bloccato(data, df_feste):
+                continue
+
+            excel_row = block_row + 1 + day
+            for p_idx in range(len(persone)):
+                cell_ref = f"{get_column_letter(block_col + 2 + p_idx)}{excel_row}"
+                dv.add(cell_ref)
+
+    for col in range(1, 16):
+        ws.column_dimensions[get_column_letter(col)].width = 13
+
+    ws_riep["A1"] = "RIEPILOGO PRESENZE"
+    ws_riep["A1"].font = Font(bold=True, size=14)
+
+    headers = ["persona", "trimestre", "UFF", "LAW", "FER", "MAL", "JOE", "Giorni conteggiati", "% UFF", "% LAW", "Esito"]
+    for j, h in enumerate(headers, start=1):
+        cell = ws_riep.cell(3, j, h)
+        cell.font = Font(bold=True)
+        cell.fill = fill_header
+        cell.border = border
+        cell.alignment = Alignment(horizontal="center")
+
+    if not riepilogo.empty:
+        for i, (_, r) in enumerate(riepilogo.iterrows(), start=4):
+            for j, h in enumerate(headers, start=1):
+                value = r[h] if h in r.index else ""
+                cell = ws_riep.cell(i, j, value)
+                cell.border = border
+                cell.alignment = Alignment(horizontal="center")
+
+    for col in range(1, 12):
+        ws_riep.column_dimensions[get_column_letter(col)].width = 16
+
+    wb.save(buffer)
+    return buffer.getvalue()
+
+
+def genera_pdf_presenze(df, df_feste, anno):
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        rightMargin=18,
+        leftMargin=18,
+        topMargin=18,
+        bottomMargin=18,
+    )
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle("MonthTitle", parent=styles["Title"], alignment=TA_CENTER, fontSize=26, leading=30)
+    small_style = ParagraphStyle("Small", parent=styles["Normal"], fontSize=7, leading=8, alignment=TA_CENTER)
+
+    elementi = []
+
+    mesi = [
+        "GENNAIO", "FEBBRAIO", "MARZO", "APRILE", "MAGGIO", "GIUGNO",
+        "LUGLIO", "AGOSTO", "SETTEMBRE", "OTTOBRE", "NOVEMBRE", "DICEMBRE"
+    ]
+    giorni = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"]
+
+    colore = {
+        "UFF": colors.HexColor("#F9CB9C"),
+        "LAW": colors.HexColor("#B6D7A8"),
+        "FER": colors.HexColor("#D5A6BD"),
+        "MAL": colors.HexColor("#FFF2CC"),
+        "JOE": colors.HexColor("#D9D2E9"),
+        "LIB": colors.HexColor("#D9D9D9"),
+        "HEADER": colors.HexColor("#EEEEEE"),
+    }
+
+    presenze = df.copy()
+    if not presenze.empty:
+        presenze["data"] = pd.to_datetime(presenze["data"]).dt.date
+        presenze["codice"] = presenze["stato"].map(CODICI).fillna(presenze["stato"])
+        lookup = {(r["data"], r["persona"]): r["codice"] for _, r in presenze.iterrows()}
+    else:
+        lookup = {}
+
+    for month in range(1, 13):
+        elementi.append(Paragraph(f"{mesi[month - 1]} {anno}", title_style))
+        elementi.append(Spacer(1, 6))
+
+        legenda_pdf = "   ".join([
+            "UFF = Presenza", "LAW = Smart", "FER = Ferie",
+            "MAL = Malattia", "JOE = Jolly", "LIB = Libero/Festivo"
+        ])
+        elementi.append(Paragraph(legenda_pdf, small_style))
+        elementi.append(Spacer(1, 8))
+
+        dati = [giorni]
+        celle_info = []
+
+        _, days_in_month = calendar.monthrange(anno, month)
+        row = ["" for _ in range(7)]
+        row_info = [None for _ in range(7)]
+
+        for day in range(1, days_in_month + 1):
+            data = date(anno, month, day)
+            wd = data.weekday()
+
+            if is_giorno_bloccato(data, df_feste):
+                testo = f"<b>{day}</b><br/>LIB"
+                code_for_bg = "LIB"
+            else:
+                righe = [f"<b>{day}</b>"]
+                codici_presenti = []
+                for persona in PERSONE:
+                    codice = lookup.get((data, persona), "")
+                    codici_presenti.append(codice)
+                    if codice:
+                        nome_breve = persona[:3]
+                        righe.append(f"{nome_breve}: {codice}")
+                testo = "<br/>".join(righe)
+                code_for_bg = codici_presenti[0] if codici_presenti and codici_presenti[0] else ""
+
+            row[wd] = Paragraph(testo, small_style)
+            row_info[wd] = code_for_bg
+
+            if wd == 6 or day == days_in_month:
+                dati.append(row)
+                celle_info.append(row_info)
+                row = ["" for _ in range(7)]
+                row_info = [None for _ in range(7)]
+
+        tabella = Table(dati, colWidths=[108] * 7, rowHeights=[24] + [72] * (len(dati) - 1))
+        stile = TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colore["HEADER"]),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ])
+
+        for r_idx, info_row in enumerate(celle_info, start=1):
+            for c_idx, codice in enumerate(info_row):
+                if codice in colore:
+                    stile.add("BACKGROUND", (c_idx, r_idx), (c_idx, r_idx), colore[codice])
+
+        tabella.setStyle(stile)
+        elementi.append(tabella)
+
+        if month < 12:
+            elementi.append(PageBreak())
+
+    doc.build(elementi)
+    return buffer.getvalue()
 
 
 righe_importate_margherita = importa_presenze_margherita_una_volta()
@@ -669,16 +680,13 @@ df_feste = leggi_feste_manuali()
 riepilogo, df_valido = calcola_riepilogo(df, df_feste)
 
 
-st.title("📅 Smart Calendar")
+st.markdown('<div class="smart-title">📅 Smart Calendar</div>', unsafe_allow_html=True)
+render_legenda()
 
 if righe_importate_margherita > 0:
     st.success(f"Import automatico completato: {righe_importate_margherita} presenze storiche di Margherita caricate.")
 
-tab1, tab2, tab3 = st.tabs([
-    "Inserisci",
-    "Festività",
-    "Riepilogo"
-])
+tab1, tab2, tab3 = st.tabs(["Inserisci", "Festività", "Riepilogo"])
 
 
 with tab1:
@@ -686,32 +694,41 @@ with tab1:
 
     giorno = st.date_input("Data", value=date.today())
     persona = st.selectbox("Persona", PERSONE)
-    stato = st.selectbox("Stato", STATI)
+    stato = st.selectbox("Stato", STATI, format_func=lambda x: f"{codice_stato(x)} — {x}")
 
-    if st.button("Salva presenza", use_container_width=True):
-        nuova_riga = pd.DataFrame([{
-            "data": pd.to_datetime(giorno),
-            "persona": persona,
-            "stato": stato
-        }])
+    if is_giorno_bloccato(giorno, df_feste):
+        st.warning("Questo giorno è LIB: weekend o festività. Non va compilato e non entra nel conteggio.")
+    else:
+        if st.button("Salva presenza", width="stretch"):
+            nuova_riga = pd.DataFrame([{"data": pd.to_datetime(giorno), "persona": persona, "stato": stato}])
 
-        df = df[
-            ~(
-                (df["data"] == pd.to_datetime(giorno)) &
-                (df["persona"] == persona)
-            )
-        ]
+            df = df[~((df["data"] == pd.to_datetime(giorno)) & (df["persona"] == persona))]
+            df = pd.concat([df, nuova_riga], ignore_index=True)
+            df = df.sort_values(["data", "persona"])
 
-        df = pd.concat([df, nuova_riga], ignore_index=True)
-        df = df.sort_values(["data", "persona"])
+            salva_presenze(df)
+
+            riepilogo, df_valido = calcola_riepilogo(df, df_feste)
+            salva_riepilogo(riepilogo)
+
+            st.success("Presenza salvata")
+            st.rerun()
+
+    if st.button("Elimina presenza selezionata", width="stretch"):
+        df = df[~((df["data"] == pd.to_datetime(giorno)) & (df["persona"] == persona))]
 
         salva_presenze(df)
 
         riepilogo, df_valido = calcola_riepilogo(df, df_feste)
         salva_riepilogo(riepilogo)
 
-        st.success("Presenza salvata")
+        st.success("Presenza eliminata")
         st.rerun()
+
+    st.divider()
+
+    oggi = date.today()
+    render_calendario_mese(df, df_feste, persona, oggi.year, oggi.month)
 
     st.divider()
 
@@ -720,37 +737,29 @@ with tab1:
     if df.empty:
         st.info("Nessuna presenza inserita")
     else:
-        ultime = df.sort_values("data", ascending=False).head(20)
-        st.dataframe(ultime, use_container_width=True, hide_index=True)
+        ultime = df.sort_values("data", ascending=False).head(12)
+        for _, r in ultime.iterrows():
+            codice = codice_stato(r["stato"])
+            data_txt = pd.to_datetime(r["data"]).strftime("%d/%m/%Y")
+            st.markdown(
+                f'<div class="last-card"><b>{data_txt}</b> — {r["persona"]} — <b>{codice}</b> {r["stato"]}</div>',
+                unsafe_allow_html=True
+            )
 
 
 with tab2:
     st.subheader("Aggiungi festività manuale")
 
-    giorno_festa = st.date_input(
-        "Data festività",
-        value=date.today(),
-        key="giorno_festa"
-    )
+    giorno_festa = st.date_input("Data festività", value=date.today(), key="giorno_festa")
+    descrizione_festa = st.text_input("Descrizione", placeholder="Es. Santo Patrono")
 
-    descrizione_festa = st.text_input(
-        "Descrizione",
-        placeholder="Es. Santo Patrono"
-    )
-
-    if st.button("Aggiungi festività", use_container_width=True):
+    if st.button("Aggiungi festività", width="stretch"):
         if descrizione_festa.strip() == "":
             st.warning("Inserisci una descrizione")
         else:
-            nuova_festa = pd.DataFrame([{
-                "data": pd.to_datetime(giorno_festa),
-                "descrizione": descrizione_festa.strip()
-            }])
+            nuova_festa = pd.DataFrame([{"data": pd.to_datetime(giorno_festa), "descrizione": descrizione_festa.strip()}])
 
-            df_feste = df_feste[
-                df_feste["data"] != pd.to_datetime(giorno_festa)
-            ]
-
+            df_feste = df_feste[df_feste["data"] != pd.to_datetime(giorno_festa)]
             df_feste = pd.concat([df_feste, nuova_festa], ignore_index=True)
             df_feste = df_feste.sort_values("data")
 
@@ -769,27 +778,14 @@ with tab2:
     if df_feste.empty:
         st.info("Nessuna festività manuale inserita")
     else:
-        st.dataframe(df_feste, use_container_width=True, hide_index=True)
+        st.dataframe(df_feste, width="stretch", hide_index=True)
 
-        opzioni_feste = (
-            df_feste["data"].dt.strftime("%Y-%m-%d")
-            + " - "
-            + df_feste["descrizione"]
-        ).tolist()
+        opzioni_feste = (df_feste["data"].dt.strftime("%Y-%m-%d") + " - " + df_feste["descrizione"]).tolist()
+        feste_da_eliminare = st.multiselect("Festività da eliminare", options=opzioni_feste)
 
-        feste_da_eliminare = st.multiselect(
-            "Festività da eliminare",
-            options=opzioni_feste
-        )
-
-        if st.button("Elimina selezionate", use_container_width=True):
-            date_da_eliminare = [
-                x.split(" - ")[0] for x in feste_da_eliminare
-            ]
-
-            df_feste = df_feste[
-                ~df_feste["data"].dt.strftime("%Y-%m-%d").isin(date_da_eliminare)
-            ]
+        if st.button("Elimina selezionate", width="stretch"):
+            date_da_eliminare = [x.split(" - ")[0] for x in feste_da_eliminare]
+            df_feste = df_feste[~df_feste["data"].dt.strftime("%Y-%m-%d").isin(date_da_eliminare)]
 
             salva_feste_manuali(df_feste)
 
@@ -806,47 +802,29 @@ with tab3:
     if riepilogo.empty:
         st.info("Nessun giorno lavorato valido")
     else:
-        st.dataframe(riepilogo, use_container_width=True, hide_index=True)
+        st.dataframe(riepilogo, width="stretch", hide_index=True)
 
     st.divider()
 
-    # Anni disponibili nei dati
     if not df.empty:
-        anni_disponibili = sorted(
-            df["data"].dt.year.dropna().unique(),
-            reverse=True
-        )
+        anni_disponibili = sorted(df["data"].dt.year.dropna().unique(), reverse=True)
     else:
         anni_disponibili = [date.today().year]
 
-    anno_selezionato = st.selectbox(
-        "Anno da esportare",
-        anni_disponibili
-    )
-
-    # filtro dati dell'anno selezionato
+    anno_selezionato = st.selectbox("Anno da esportare", anni_disponibili)
     df_anno = df[df["data"].dt.year == anno_selezionato].copy()
 
     csv_export = df_anno.to_csv(index=False).encode("utf-8")
 
-    excel_formattato = genera_excel_formattato(
-        df_anno,
-        df_feste,
-        riepilogo,
-        anno=int(anno_selezionato)
-    )
-
-    pdf_presenze = genera_pdf_presenze(
-        df_anno,
-        anno=int(anno_selezionato)
-    )
+    excel_formattato = genera_excel_formattato(df_anno, df_feste, riepilogo, anno=int(anno_selezionato))
+    pdf_presenze = genera_pdf_presenze(df_anno, df_feste, anno=int(anno_selezionato))
 
     st.download_button(
         "Scarica CSV",
         data=csv_export,
         file_name=f"smart_calendar_{anno_selezionato}.csv",
         mime="text/csv",
-        use_container_width=True
+        width="stretch"
     )
 
     st.download_button(
@@ -854,13 +832,13 @@ with tab3:
         data=excel_formattato,
         file_name=f"smart_calendar_{anno_selezionato}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True
+        width="stretch"
     )
 
     st.download_button(
-        "Scarica PDF presenze",
+        "Scarica PDF",
         data=pdf_presenze,
         file_name=f"smart_calendar_{anno_selezionato}_presenze.pdf",
         mime="application/pdf",
-        use_container_width=True
+        width="stretch"
     )
