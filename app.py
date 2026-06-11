@@ -349,34 +349,58 @@ def calcola_riepilogo(df, df_feste):
 
 
 def render_legenda():
-    """Legenda stabile come tabella, senza HTML libero."""
-    legenda = pd.DataFrame([
-        {"Codice": "UFF", "Significato": "Presenza / ufficio", "Conteggio": "Sì"},
-        {"Codice": "LAW", "Significato": "Smart working", "Conteggio": "Sì"},
-        {"Codice": "FER", "Significato": "Ferie", "Conteggio": "No"},
-        {"Codice": "MAL", "Significato": "Malattia", "Conteggio": "No"},
-        {"Codice": "JOE", "Significato": "Jolly", "Conteggio": "No"},
-        {"Codice": "LIB", "Significato": "Weekend / festività", "Conteggio": "No"},
-    ])
+    """Legenda compatta come tabella piccola, senza colonna conteggio."""
+    st.markdown("""
+<style>
+.legend-table{
+    width: 430px;
+    max-width: 100%;
+    border-collapse: collapse;
+    margin: 6px 0 18px 0;
+    font-size: 13px;
+}
+.legend-table td{
+    padding: 6px 10px;
+    border: 1px solid rgba(255,255,255,0.16);
+}
+.legend-code{
+    width: 72px;
+    text-align: center;
+    font-weight: 900;
+    color: #000000;
+}
+.legend-desc{
+    font-weight: 600;
+}
+.leg-uff{background:#ff8a00;}
+.leg-law{background:#19e635;}
+.leg-fer{background:#8a078a;color:#ffffff;}
+.leg-mal{background:#fff200;}
+.leg-joe{background:#6f42c1;color:#ffffff;}
+.leg-lib{background:#d9d9d9;}
+</style>
+<table class="legend-table">
+<tr><td class="legend-code leg-uff">UFF</td><td class="legend-desc">Presenza / ufficio</td></tr>
+<tr><td class="legend-code leg-law">LAW</td><td class="legend-desc">Smart working</td></tr>
+<tr><td class="legend-code leg-fer">FER</td><td class="legend-desc">Ferie</td></tr>
+<tr><td class="legend-code leg-mal">MAL</td><td class="legend-desc">Malattia</td></tr>
+<tr><td class="legend-code leg-joe">JOE</td><td class="legend-desc">Jolly</td></tr>
+<tr><td class="legend-code leg-lib">LIB</td><td class="legend-desc">Weekend / festività</td></tr>
+</table>
+""", unsafe_allow_html=True)
 
-    def stile_legenda(row):
-        colore = COLORI.get(row["Codice"], "#ffffff")
-        return [
-            f"background-color: {colore}; color: #000000; font-weight: bold; text-align: center;",
-            "text-align: left;",
-            "text-align: center; font-weight: bold;",
-        ]
 
-    st.caption("Legenda")
-    st.dataframe(
-        legenda.style.apply(stile_legenda, axis=1),
-        hide_index=True,
-        width="stretch"
-    )
+def abbrevia_persona(nome):
+    nome = str(nome).strip()
+    if nome.lower().startswith("margherita"):
+        return "MAR"
+    if nome.lower().startswith("roberto"):
+        return "ROB"
+    return nome[:3].upper()
 
 
-def render_calendario_mese(df, df_feste, persona, anno, mese):
-    """Calendario mensile stabile e leggibile, senza HTML renderizzato male."""
+def render_calendario_mese(df, df_feste, anno, mese):
+    """Calendario del mese corrente con tutte le persone nella stessa cella."""
     mesi_it = [
         "GENNAIO", "FEBBRAIO", "MARZO", "APRILE", "MAGGIO", "GIUGNO",
         "LUGLIO", "AGOSTO", "SETTEMBRE", "OTTOBRE", "NOVEMBRE", "DICEMBRE"
@@ -389,10 +413,10 @@ def render_calendario_mese(df, df_feste, persona, anno, mese):
         tmp["data"] = pd.to_datetime(tmp["data"], errors="coerce").dt.date
         tmp = tmp.dropna(subset=["data"])
         tmp["codice"] = tmp["stato"].map(CODICI).fillna(tmp["stato"])
-        tmp = tmp[tmp["persona"] == persona]
-        lookup = {r["data"]: r["codice"] for _, r in tmp.iterrows()}
+        for _, r in tmp.iterrows():
+            lookup[(r["data"], r["persona"])] = r["codice"]
 
-    primo_giorno, giorni_mese = calendar.monthrange(anno, mese)
+    _, giorni_mese = calendar.monthrange(anno, mese)
 
     settimane = []
     settimana = ["" for _ in range(7)]
@@ -401,8 +425,17 @@ def render_calendario_mese(df, df_feste, persona, anno, mese):
         data = date(anno, mese, day)
         weekday = data.weekday()
         bloccato = is_giorno_bloccato(data, df_feste)
-        codice = "LIB" if bloccato else lookup.get(data, "")
-        testo = str(day) if codice == "" else f"{day}\n{codice}"
+
+        if bloccato:
+            testo = f"{day} LIB"
+        else:
+            righe = [str(day)]
+            for persona in PERSONE:
+                codice = lookup.get((data, persona), "")
+                if codice:
+                    righe.append(f"{abbrevia_persona(persona)} {codice}")
+            testo = "\n".join(righe)
+
         settimana[weekday] = testo
 
         if weekday == 6:
@@ -416,19 +449,25 @@ def render_calendario_mese(df, df_feste, persona, anno, mese):
 
     def colore_cella(valore):
         testo = str(valore)
+        base = "text-align: center; white-space: pre-line; font-weight: 800;"
+        if testo.strip() == "":
+            return base
         if "LIB" in testo:
-            return "background-color: #d9d9d9; color: #000000; font-weight: bold; text-align: center; white-space: pre-line;"
-        if "UFF" in testo:
-            return "background-color: #ff8a00; color: #000000; font-weight: bold; text-align: center; white-space: pre-line;"
-        if "LAW" in testo:
-            return "background-color: #19e635; color: #000000; font-weight: bold; text-align: center; white-space: pre-line;"
-        if "FER" in testo:
-            return "background-color: #8a078a; color: #ffffff; font-weight: bold; text-align: center; white-space: pre-line;"
-        if "MAL" in testo:
-            return "background-color: #fff200; color: #000000; font-weight: bold; text-align: center; white-space: pre-line;"
-        if "JOE" in testo:
-            return "background-color: #6f42c1; color: #ffffff; font-weight: bold; text-align: center; white-space: pre-line;"
-        return "text-align: center; white-space: pre-line;"
+            return f"background-color: #d9d9d9; color: #000000; {base}"
+
+        codici_presenti = [c for c in ["UFF", "LAW", "FER", "MAL", "JOE"] if c in testo]
+        codici_unici = set(codici_presenti)
+
+        if len(codici_unici) == 1:
+            codice = list(codici_unici)[0]
+            colore = COLORI.get(codice, "#111827")
+            colore_testo = "#ffffff" if codice in ["FER", "JOE"] else "#000000"
+            return f"background-color: {colore}; color: {colore_testo}; {base}"
+
+        if len(codici_unici) > 1:
+            return f"background-color: #374151; color: #ffffff; {base}"
+
+        return base
 
     st.markdown(f"### {mesi_it[mese - 1]} {anno}")
     st.dataframe(
@@ -766,23 +805,7 @@ with tab1:
     st.divider()
 
     oggi = date.today()
-    render_calendario_mese(df, df_feste, persona, oggi.year, oggi.month)
-
-    st.divider()
-
-    st.subheader("Ultime presenze")
-
-    if df.empty:
-        st.info("Nessuna presenza inserita")
-    else:
-        ultime = df.sort_values("data", ascending=False).head(12)
-        for _, r in ultime.iterrows():
-            codice = codice_stato(r["stato"])
-            data_txt = pd.to_datetime(r["data"]).strftime("%d/%m/%Y")
-            st.markdown(
-                f'<div class="last-card"><b>{data_txt}</b> — {r["persona"]} — <b>{codice}</b> {r["stato"]}</div>',
-                unsafe_allow_html=True
-            )
+    render_calendario_mese(df, df_feste, oggi.year, oggi.month)
 
 
 with tab2:
